@@ -143,14 +143,25 @@ div[data-testid="stSidebar"] [data-testid="stImage"] img {
     display: block;
 }
 
-/* 6. Eliminação dos Círculos de RadioButton e Navegação Minimalista com Setas */
+/* 6. Eliminação dos Círculos de RadioButton e Navegação Minimalista com Setas Dinâmicas */
+div[data-testid="stRadioButton"] input[type="radio"],
+div[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"],
+section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"],
 div[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child,
-section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-of-type:not(:last-of-type) {
     display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 div[data-testid="stSidebar"] div[role="radiogroup"] label,
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
     padding: 10px 16px !important;
     border-radius: 8px !important;
     margin-bottom: 6px !important;
@@ -160,7 +171,12 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label {
     background: transparent !important;
     border: 1px solid transparent !important;
     box-shadow: none !important;
-    cursor: pointer;
+    cursor: pointer !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label > div:last-child,
+section[data-testid="stSidebar"] div[role="radiogroup"] label > div:last-child {
+    width: 100% !important;
 }
 
 div[data-testid="stSidebar"] div[role="radiogroup"] label p,
