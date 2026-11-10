@@ -35,12 +35,12 @@ if not exist ".venv\Scripts\activate.bat" (
 call ".venv\Scripts\activate.bat"
 
 :: 4. Instala ou atualiza os pacotes do requirements.txt se necessario
-if not exist ".venv\.deps_v2_ok" (
-    echo [2/3] Instalando/atualizando dependencias do projeto (requirements.txt)...
+if not exist ".venv\.deps_ok" (
+    echo [2/3] Instalando dependencias do projeto (requirements.txt)...
     python -m pip install --upgrade pip
     pip install -r requirements.txt
     if %errorlevel% equ 0 (
-        echo ok > ".venv\.deps_v2_ok"
+        echo ok > ".venv\.deps_ok"
     ) else (
         echo [ERRO] Falha ao instalar as dependencias. Verifique sua conexao.
         pause
