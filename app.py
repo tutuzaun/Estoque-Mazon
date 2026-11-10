@@ -46,15 +46,7 @@ def resolver_caminho_recurso(nome_arquivo: str) -> str:
 # ==============================================================================
 # CONFIGURAÇÃO DA PÁGINA E INJEÇÃO DE CSS (LUXURY MINIMALIST UI)
 # ==============================================================================
-_caminho_icone = resolver_caminho_recurso("logo2.png")
-if not os.path.exists(_caminho_icone):
-    for _cand in ["logo2.jpg", "logo2.jpeg", "logo.png", "logo.jpeg", "logo.jpg"]:
-        _teste = resolver_caminho_recurso(_cand)
-        if os.path.exists(_teste):
-            _caminho_icone = _teste
-            break
-
-_icone_aba = Image.open(_caminho_icone) if os.path.exists(_caminho_icone) else "🍣"
+_icone_aba = Image.open("logo2.png")
 
 st.set_page_config(
     page_title="Restaurante Mazon | Gestão de Estoque & Inteligência Financeira",
