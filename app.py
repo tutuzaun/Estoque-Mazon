@@ -97,21 +97,29 @@ def injetar_estilo_luxury_minimalist() -> None:
         "font-weight: normal !important;"
         "font-style: normal !important;"
         "}"
-        "div[data-testid='stRadioButton'] input[type='radio'], "
-        "div[data-testid='stSidebar'] div[role='radiogroup'] input[type='radio'], "
-        "section[data-testid='stSidebar'] div[role='radiogroup'] input[type='radio'], "
-        "div[data-testid='stSidebar'] div[role='radiogroup'] label > div:first-child, "
-        "section[data-testid='stSidebar'] div[role='radiogroup'] label > div:first-child, "
-        "section[data-testid='stSidebar'] [data-testid='stRadio'] label[data-baseweb='radio'] > div:first-of-type:not(:last-of-type) {"
-        "display: none !important; width: 0 !important; height: 0 !important; margin: 0 !important; padding: 0 !important;"
+        "/* Esconde totalmente a bolinha/círculo do st.radio */"
+        "div[data-testid='stRadioButton'] label > div:first-child, "
+        "div[data-testid='stRadio'] label > div:first-child, "
+        "section[data-testid='stSidebar'] div[role='radiogroup'] label > div:first-child {"
+        "display: none !important;"
         "}"
-        "div[data-testid='stSidebar'] div[role='radiogroup'] label, "
+        "/* Ajusta o espaçamento dos itens do menu */"
+        "div[data-testid='stRadioButton'] label, "
+        "div[data-testid='stRadio'] label, "
         "section[data-testid='stSidebar'] div[role='radiogroup'] label {"
-        "width: 100% !important; display: flex !important; align-items: center !important; cursor: pointer !important;"
+        "cursor: pointer; padding: 6px 10px; border-radius: 6px; transition: background-color 0.2s ease;"
         "}"
-        "div[data-testid='stSidebar'] div[role='radiogroup'] label > div:last-child, "
-        "section[data-testid='stSidebar'] div[role='radiogroup'] label > div:last-child {"
-        "width: 100% !important;"
+        "/* Efeito hover nos itens */"
+        "div[data-testid='stRadioButton'] label:hover, "
+        "div[data-testid='stRadio'] label:hover, "
+        "section[data-testid='stSidebar'] div[role='radiogroup'] label:hover {"
+        "background-color: rgba(255, 255, 255, 0.05);"
+        "}"
+        "/* Gira a seta '›' em 90 graus para baixo quando o item estiver selecionado */"
+        "div[data-testid='stRadioButton'] label:has(input:checked), "
+        "div[data-testid='stRadio'] label:has(input:checked), "
+        "section[data-testid='stSidebar'] div[role='radiogroup'] label:has(input:checked) {"
+        "font-weight: bold;"
         "}"
         "</style>"
     )
@@ -122,6 +130,36 @@ def injetar_estilo_luxury_minimalist() -> None:
         with open(caminho_css, "r", encoding="utf-8") as f:
             css_content = f.read()
         st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
+
+    st.markdown(
+        """<style>
+/* Esconde totalmente a bolinha/círculo do st.radio (todas as versões do Streamlit) */
+div[data-testid="stRadioButton"] [role="radio"],
+div[data-testid="stRadioButton"] label > div:first-child,
+div[data-baseweb="radio"] > div:first-child,
+label[data-baseweb="radio"] > div:first-child {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0px !important;
+    height: 0px !important;
+}
+
+/* Remaneja o alinhamento do texto */
+div[data-testid="stRadioButton"] label,
+label[data-baseweb="radio"] {
+    padding-left: 5px !important;
+    margin-left: 0px !important;
+    cursor: pointer !important;
+}
+
+/* Destaca o item selecionado */
+div[data-testid="stRadioButton"] label:has(input:checked),
+label[data-baseweb="radio"]:has(input:checked) {
+    font-weight: bold !important;
+}
+</style>""",
+        unsafe_allow_html=True,
+    )
 
 
 injetar_estilo_luxury_minimalist()
@@ -327,24 +365,6 @@ else:
         unsafe_allow_html=True,
     )
 
-MODULOS_MENU = [
-    "Dashboard Principal",
-    "Gestão e Tabela de Estoque",
-    "Comparativo de Preços",
-    "Central OCR / IA",
-    "Gerador de Lista de Compras",
-]
-
-if "pagina_ativa" not in st.session_state:
-    st.session_state["pagina_ativa"] = MODULOS_MENU[0]
-
-
-def formatar_opcao_menu(opcao: str) -> str:
-    """Exibe seta para baixo (▼) no item selecionado e seta para a direita (›) nos demais."""
-    seta = "▼" if opcao == st.session_state.get("pagina_ativa") else "›"
-    return f"{seta}  {opcao}"
-
-
 with st.sidebar:
     st.markdown(
         '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.5px; color:#D4A24C; font-weight:500; margin: 6px 0 8px 16px; opacity:0.85;">Navegação</p>',
@@ -352,15 +372,15 @@ with st.sidebar:
     )
     pagina_selecionada = st.radio(
         label="Módulos do Sistema",
-        options=MODULOS_MENU,
-        index=MODULOS_MENU.index(st.session_state["pagina_ativa"]),
-        format_func=formatar_opcao_menu,
+        options=[
+            "› Dashboard Principal",
+            "› Gestão e Tabela de Estoque",
+            "› Comparativo de Preços",
+            "› Central OCR / IA",
+            "› Gerador de Lista de Compras",
+        ],
         label_visibility="collapsed",
     )
-
-    if pagina_selecionada != st.session_state["pagina_ativa"]:
-        st.session_state["pagina_ativa"] = pagina_selecionada
-        st.rerun()
 
     st.markdown('<hr style="border-color: rgba(255,255,255,0.07); margin: 18px 0;">', unsafe_allow_html=True)
 
@@ -409,7 +429,7 @@ with st.sidebar:
 # ==============================================================================
 # PÁGINA 1: DASHBOARD PRINCIPAL
 # ==============================================================================
-if pagina_selecionada == "Dashboard Principal":
+if pagina_selecionada == "› Dashboard Principal":
     st.markdown(
         '<div style="margin-bottom: 20px;">'
         '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Painel Executivo &amp; Controle de Estoque</h1>'
@@ -592,7 +612,7 @@ if pagina_selecionada == "Dashboard Principal":
 # ==============================================================================
 # PÁGINA 2: GESTÃO E TABELA DE ESTOQUE
 # ==============================================================================
-elif pagina_selecionada == "Gestão e Tabela de Estoque":
+elif pagina_selecionada == "› Gestão e Tabela de Estoque":
     st.markdown(
         '<div style="margin-bottom: 18px;">'
         '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Gestão e Tabela de Estoque</h1>'
@@ -764,7 +784,7 @@ elif pagina_selecionada == "Gestão e Tabela de Estoque":
 # ==============================================================================
 # PÁGINA 3: COMPARATIVO DE PREÇOS
 # ==============================================================================
-elif pagina_selecionada == "Comparativo de Preços":
+elif pagina_selecionada == "› Comparativo de Preços":
     st.markdown(
         '<div style="margin-bottom: 18px;">'
         '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Inteligência de Preços e Fornecedores</h1>'
@@ -940,7 +960,7 @@ elif pagina_selecionada == "Comparativo de Preços":
 # ==============================================================================
 # PÁGINA 4: CENTRAL OCR / IA
 # ==============================================================================
-elif pagina_selecionada == "Central OCR / IA":
+elif pagina_selecionada == "› Central OCR / IA":
     st.markdown(
         '<div style="margin-bottom: 18px;">'
         '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Central de Ingestão Documental (OCR / IA)</h1>'
@@ -1039,7 +1059,7 @@ elif pagina_selecionada == "Central OCR / IA":
 # ==============================================================================
 # PÁGINA 5: GERADOR DE LISTA DE COMPRAS
 # ==============================================================================
-elif pagina_selecionada == "Gerador de Lista de Compras":
+elif pagina_selecionada == "› Gerador de Lista de Compras":
     st.markdown(
         '<div style="margin-bottom: 18px;">'
         '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Gerador Inteligente de Lista de Compras</h1>'

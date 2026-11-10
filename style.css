@@ -143,40 +143,34 @@ div[data-testid="stSidebar"] [data-testid="stImage"] img {
     display: block;
 }
 
-/* 6. Eliminação dos Círculos de RadioButton e Navegação Minimalista com Setas Dinâmicas */
-div[data-testid="stRadioButton"] input[type="radio"],
-div[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"],
-section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"],
+/* 6. Esconde totalmente a bolinha/círculo do st.radio (todas as versões do Streamlit) */
+div[data-testid="stRadioButton"] [role="radio"],
+div[data-testid="stRadioButton"] label > div:first-child,
+div[data-baseweb="radio"] > div:first-child,
+label[data-baseweb="radio"] > div:first-child,
+div[data-testid="stRadio"] label > div:first-child,
 div[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child,
-section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child,
-section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-of-type:not(:last-of-type) {
+section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
     display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    visibility: hidden !important;
+    width: 0px !important;
+    height: 0px !important;
 }
 
+div[data-testid="stRadioButton"] label,
+div[data-testid="stRadio"] label,
 div[data-testid="stSidebar"] div[role="radiogroup"] label,
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
-    width: 100% !important;
-    display: flex !important;
-    align-items: center !important;
-    padding: 10px 16px !important;
-    border-radius: 8px !important;
+    cursor: pointer;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
     margin-bottom: 6px !important;
-    transition: all 0.2s ease !important;
+    transition: background-color 0.2s ease !important;
     color: #C5D1DE !important;
     font-size: 0.9rem !important;
     background: transparent !important;
     border: 1px solid transparent !important;
     box-shadow: none !important;
-    cursor: pointer !important;
-}
-
-div[data-testid="stSidebar"] div[role="radiogroup"] label > div:last-child,
-section[data-testid="stSidebar"] div[role="radiogroup"] label > div:last-child {
-    width: 100% !important;
 }
 
 div[data-testid="stSidebar"] div[role="radiogroup"] label p,
