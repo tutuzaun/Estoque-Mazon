@@ -1,0 +1,478 @@
+/* ==========================================================================
+   RESTAURANTE MAZON - DESIGN SYSTEM "LUXURY MINIMALIST UI"
+   Paleta Oficial inspirada na Logo Mazon (Cream #F4EDE3 & Deep Navy #0B1B2B)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-canvas: #F4EDE3;        /* Creme / Palha exato da logo */
+    --bg-sidebar: #0B1B2B;       /* Azul Marinho Profundo exato da logo */
+    --bg-card: #FFFFFF;          /* Branco minimalista */
+    --bg-card-soft: #FAF7F2;     /* Creme sutil */
+    --border-subtle: #EBE4D8;    /* Borda quase imperceptível */
+    --text-navy: #0B1B2B;        /* Texto principal Azul Marinho */
+    --text-muted: #687787;       /* Texto secundário suave */
+    --sidebar-text: #C5D1DE;     /* Texto inativo na sidebar */
+    --cream-light: #F4EDE3;      /* Texto claro sobre fundo marinho */
+    --gold-accent: #D4A24C;      /* Dourado Mazon */
+    --alert-critical: #D9383A;   /* Vermelho minimalista */
+    --status-ok: #1F9D55;        /* Verde elegante */
+    --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    --card-radius: 12px;
+}
+
+/* 1. Tipografia Poppins restrita EXCLUSIVAMENTE a elementos de texto */
+html, body, p, h1, h2, h3, h4, h5, h6,
+label, input, button, select, textarea,
+td, th, .stMarkdown p {
+    font-family: 'Poppins', sans-serif !important;
+}
+
+/* 2. Proteção Absoluta para Ícones do Streamlit (Material Symbols / Icons) */
+[data-testid="stIcon"],
+[data-testid="stIconMaterial"],
+span[data-testid="stIconMaterial"],
+button [data-testid="stIconMaterial"],
+summary [data-testid="stIconMaterial"],
+header [data-testid="stIconMaterial"],
+i,
+.material-symbols-outlined,
+.material-icons,
+[class*="st-emotion-cache"] i {
+    font-family: 'Material Symbols Outlined', 'Material Symbols Rounded', 'Material Icons' !important;
+    font-weight: normal !important;
+    font-style: normal !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    line-height: 1 !important;
+}
+
+/* 3. Fundo do App (Main Canvas) e Texto Global */
+.stApp,
+[data-testid="stAppViewContainer"] {
+    background-color: var(--bg-canvas) !important;
+    color: var(--text-navy) !important;
+}
+
+header[data-testid="stHeader"] {
+    background-color: transparent !important;
+}
+
+.block-container {
+    padding-top: 2rem !important;
+    padding-bottom: 3rem !important;
+}
+
+h1, h2, h3, h4, h5, h6, .mazon-title {
+    color: var(--text-navy) !important;
+    font-weight: 500 !important;
+    letter-spacing: -0.3px;
+}
+
+p, label {
+    color: var(--text-navy);
+}
+
+/* 4. Botão Nativo de Expandir / Recolher a Sidebar sempre visível e minimalista */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"],
+[data-testid="stExpandSidebarButton"] {
+    visibility: visible !important;
+    display: flex !important;
+    opacity: 1 !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(244, 237, 227, 0.12) !important;
+    border-radius: 8px !important;
+    color: var(--cream-light) !important;
+    padding: 4px !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button:hover {
+    background: rgba(212, 162, 76, 0.15) !important;
+    border-color: var(--gold-accent) !important;
+    color: var(--gold-accent) !important;
+}
+
+[data-testid="collapsedControl"] button,
+[data-testid="stExpandSidebarButton"] button {
+    background-color: var(--bg-sidebar) !important;
+    color: var(--cream-light) !important;
+    border: 1px solid rgba(212, 162, 76, 0.4) !important;
+    border-radius: 8px !important;
+    box-shadow: var(--card-shadow) !important;
+}
+
+/* 5. Barra Lateral (Sidebar) em Azul Marinho Profundo (#0B1B2B) */
+section[data-testid="stSidebar"],
+div[data-testid="stSidebar"] {
+    background-color: var(--bg-sidebar) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] h4,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] label {
+    color: var(--sidebar-text) !important;
+}
+
+/* Logo Integrada à Sidebar sem Card ou Fundo ao redor */
+section[data-testid="stSidebar"] [data-testid="stImage"],
+div[data-testid="stSidebar"] [data-testid="stImage"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 8px !important;
+    margin: 4px auto 14px auto !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stImage"] img,
+div[data-testid="stSidebar"] [data-testid="stImage"] img {
+    border-radius: 12px !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    display: block;
+}
+
+/* 6. Eliminação dos Círculos de RadioButton e Navegação Minimalista com Setas */
+div[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child,
+section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+    display: none !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label,
+section[data-testid="stSidebar"] div[role="radiogroup"] label {
+    padding: 10px 16px !important;
+    border-radius: 8px !important;
+    margin-bottom: 6px !important;
+    transition: all 0.2s ease !important;
+    color: #C5D1DE !important;
+    font-size: 0.9rem !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    cursor: pointer;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label p,
+section[data-testid="stSidebar"] div[role="radiogroup"] label p {
+    color: #C5D1DE !important;
+    font-size: 0.9rem !important;
+    font-weight: 400 !important;
+    margin: 0 !important;
+    transition: color 0.2s ease !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label:hover,
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    color: #FFFFFF !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label:hover p,
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover p {
+    color: #FFFFFF !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked),
+section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+    background: rgba(212, 162, 76, 0.08) !important;
+    color: #D4A24C !important;
+    border-left: 2px solid #D4A24C !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p,
+section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
+    color: #D4A24C !important;
+    font-weight: 500 !important;
+}
+
+/* Inputs dentro da Sidebar */
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div,
+section[data-testid="stSidebar"] div[data-baseweb="input"] > div,
+section[data-testid="stSidebar"] .stNumberInput div[data-baseweb="input"] > div {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(244, 237, 227, 0.14) !important;
+    color: var(--cream-light) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+section[data-testid="stSidebar"] input {
+    color: var(--cream-light) !important;
+}
+
+/* 7. Refinamento Minimalista dos Cards e KPIs (Sem bordas grossas coloridas no topo) */
+.mazon-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--card-radius);
+    padding: 1.4rem 1.5rem;
+    margin-bottom: 1.2rem;
+    box-shadow: var(--card-shadow);
+}
+
+.mazon-kpi-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--card-radius);
+    padding: 1.35rem 1.5rem;
+    text-align: left;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mazon-kpi-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(11, 27, 43, 0.05);
+}
+
+.mazon-kpi-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 400;
+}
+
+.mazon-kpi-value {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.85rem;
+    font-weight: 600;
+    color: var(--text-navy);
+    line-height: 1.2;
+}
+
+.mazon-kpi-sub {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 300;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+/* 8. Card de Alertas / Contagem Minimalista */
+.critical-hero-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--card-radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--card-shadow);
+}
+
+.critical-hero-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.critical-hero-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.02rem;
+    font-weight: 600;
+    color: var(--text-navy);
+    letter-spacing: 0.1px;
+}
+
+.critical-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.critical-item-pill {
+    background-color: var(--bg-card-soft);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 11px 14px;
+    transition: border-color 0.15s ease;
+}
+
+.critical-item-pill:hover {
+    border-color: var(--gold-accent);
+}
+
+/* 9. Badges Minimalistas */
+.badge-critico {
+    background-color: rgba(217, 56, 58, 0.08);
+    color: #C8232C;
+    border: 1px solid rgba(217, 56, 58, 0.25);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.badge-alerta {
+    background-color: rgba(212, 162, 76, 0.12);
+    color: #9A6B1F;
+    border: 1px solid rgba(212, 162, 76, 0.4);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.badge-ok {
+    background-color: rgba(31, 157, 85, 0.08);
+    color: #187941;
+    border: 1px solid rgba(31, 157, 85, 0.25);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.badge-pendente {
+    background-color: rgba(11, 27, 43, 0.04);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.badge-best-price {
+    background-color: var(--bg-sidebar);
+    color: var(--cream-light);
+    border: 1px solid rgba(212, 162, 76, 0.6);
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+
+/* 10. Botões Primários e Download */
+.stButton > button,
+.stDownloadButton > button,
+button[kind="primaryFormSubmit"],
+[data-testid="stFormSubmitButton"] > button {
+    background-color: var(--bg-sidebar) !important;
+    color: var(--cream-light) !important;
+    font-weight: 500 !important;
+    border: 1px solid rgba(212, 162, 76, 0.5) !important;
+    border-radius: 10px !important;
+    padding: 0.55rem 1.2rem !important;
+    box-shadow: var(--card-shadow) !important;
+    transition: all 0.2s ease !important;
+}
+
+.stButton > button p,
+.stDownloadButton > button p,
+[data-testid="stFormSubmitButton"] > button p {
+    color: var(--cream-light) !important;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+button[kind="primaryFormSubmit"]:hover,
+[data-testid="stFormSubmitButton"] > button:hover {
+    background-color: #132A40 !important;
+    border-color: var(--gold-accent) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+}
+
+/* 11. Inputs, Selectboxes, Expanders e File Uploader Minimalistas */
+div[data-baseweb="input"] > div,
+div[data-baseweb="select"] > div,
+.stNumberInput div[data-baseweb="input"] > div {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 10px !important;
+    color: var(--text-navy) !important;
+    box-shadow: none !important;
+}
+
+div[data-testid="stExpander"] {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--card-radius) !important;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+section[data-testid="stFileUploaderDropzone"] {
+    background-color: var(--bg-card) !important;
+    border: 1.5px dashed var(--gold-accent) !important;
+    border-radius: var(--card-radius) !important;
+    padding: 26px !important;
+    box-shadow: var(--card-shadow);
+}
+
+/* 12. Tabelas Minimalistas Arredondadas */
+.mazon-table-wrapper {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+}
+
+.mazon-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--bg-card);
+    font-size: 0.87rem;
+}
+
+.mazon-table thead tr {
+    background-color: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: left;
+}
+
+.mazon-table th {
+    padding: 13px 16px;
+    color: var(--cream-light);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.74rem;
+    letter-spacing: 0.6px;
+}
+
+.mazon-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-navy);
+}
+
+.mazon-table tbody tr:nth-child(even) {
+    background-color: var(--bg-card-soft);
+}
+
+.mazon-table tbody tr:hover {
+    background-color: rgba(212, 162, 76, 0.08);
+}
+
+/* Divisores */
+hr {
+    border-color: var(--border-subtle) !important;
+}

@@ -1,0 +1,11 @@
+[browser]
+gatherUsageStats = false
+
+[global]
+developmentMode = false
+
+[theme]
+primaryColor = "#0B1B2B"
+backgroundColor = "#F4EDE3"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0B1B2B"
