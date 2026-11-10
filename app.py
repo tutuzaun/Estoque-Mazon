@@ -14,32 +14,25 @@ from typing import Optional
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from PIL import Image
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Image as RLImage,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from sheets_manager import (
     CATEGORIAS_OFICIAIS,
     MazonSheetsManager,
     processar_documento_ocr_ia,
 )
-
-# ==============================================================================
-# CONFIGURAÇÃO DA PÁGINA E INJEÇÃO DE CSS (LUXURY MINIMALIST UI)
-# ==============================================================================
-st.set_page_config(
-    page_title="Restaurante Mazon | Gestão de Estoque & Inteligência Financeira",
-    page_icon="🍣",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# Força a limpeza do cache de memória na primeira execução da sessão
-if "init_estoque_reset" not in st.session_state:
-    st.session_state.estoque_df = None
-    st.session_state["init_estoque_reset"] = True
 
 
 def resolver_caminho_recurso(nome_arquivo: str) -> str:
@@ -48,6 +41,32 @@ def resolver_caminho_recurso(nome_arquivo: str) -> str:
         return nome_arquivo
     caminho_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), nome_arquivo)
     return caminho_script
+
+
+# ==============================================================================
+# CONFIGURAÇÃO DA PÁGINA E INJEÇÃO DE CSS (LUXURY MINIMALIST UI)
+# ==============================================================================
+_caminho_icone = resolver_caminho_recurso("logo2.png")
+if not os.path.exists(_caminho_icone):
+    for _cand in ["logo2.jpg", "logo2.jpeg", "logo.png", "logo.jpeg", "logo.jpg"]:
+        _teste = resolver_caminho_recurso(_cand)
+        if os.path.exists(_teste):
+            _caminho_icone = _teste
+            break
+
+_icone_aba = Image.open(_caminho_icone) if os.path.exists(_caminho_icone) else "🍣"
+
+st.set_page_config(
+    page_title="Restaurante Mazon | Gestão de Estoque & Inteligência Financeira",
+    page_icon=_icone_aba,
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# Força a limpeza do cache de memória na primeira execução da sessão
+if "init_estoque_reset" not in st.session_state:
+    st.session_state.estoque_df = None
+    st.session_state["init_estoque_reset"] = True
 
 
 def obter_caminho_logo() -> Optional[str]:
@@ -201,7 +220,7 @@ def gerar_pdf_lista_compras(df_compras: pd.DataFrame, custo_total_compra: float)
     caminho_logo = obter_caminho_logo()
     if caminho_logo and os.path.exists(caminho_logo):
         try:
-            img_logo = Image(caminho_logo, width=140, height=90)
+            img_logo = RLImage(caminho_logo, width=140, height=90)
             img_logo.hAlign = "CENTER"
             elementos.append(img_logo)
             elementos.append(Spacer(1, 4 * mm))
