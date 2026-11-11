@@ -1,14 +1,20 @@
 """
-Módulo de Persistência em Nuvem (Google Sheets & Google Drive) - Restaurante Mazon
-Gerencia autenticação via Service Account / OAuth, estrutura das 5 abas obrigatórias,
-sincronização da base oficial de insumos, upload no Google Drive e preparação para OCR/IA.
+Módulo Unificado de Persistência em Nuvem (Google Sheets & Google Drive) + RBAC & Auditoria
+Restaurante Mazon - Gestão de Estoque e Inteligência Financeira
+Centraliza o banco de dados em uma única planilha ("Mazon - Banco de Dados") com as abas:
+1. Usuarios
+2. Logs_Auditoria
+3. Estoque
+4. Financeiro
+E gerencia o upload de Notas Fiscais e Comprovantes em uma única pasta principal no Google Drive
+com criação automática das subpastas /Notas_Fiscais e /Comprovantes.
 """
 
 from __future__ import annotations
 
 import io
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import gspread
@@ -24,8 +30,22 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-# Esquema obrigatório das 5 abas do banco de dados no Google Sheets
+# Esquema Unificado das 4 Abas Principais na Planilha Única "Mazon - Banco de Dados"
 SHEETS_SCHEMA: Dict[str, List[str]] = {
+    "Usuarios": [
+        "Usuario",
+        "Perfil",
+        "Senha",
+        "Data_Cadastro",
+        "Ativo",
+    ],
+    "Logs_Auditoria": [
+        "Data_Hora",
+        "Usuario",
+        "Perfil",
+        "Acao",
+        "Modulo",
+    ],
     "Estoque": [
         "ID",
         "Item",
@@ -34,39 +54,35 @@ SHEETS_SCHEMA: Dict[str, List[str]] = {
         "Qtd_Atual",
         "Est_Minimo",
         "Est_Maximo",
+        "Preco_Unitario",
+        "Fornecedor",
         "Data_Ultima_Reposicao",
         "Status",
     ],
-    "Fornecedores_Precos": [
-        "ID",
-        "Insumo",
-        "Fornecedor",
-        "Preco_Unitario",
-        "Unidade",
-        "Data_Registro",
-    ],
-    "Entradas_Compras": [
-        "ID_Nota",
+    "Financeiro": [
+        "ID_Lancamento",
         "Data",
+        "Tipo",
+        "Natureza_Custo",
+        "Descricao",
+        "Categoria",
         "Fornecedor",
-        "Valor_Total",
-        "Link_Drive",
-    ],
-    "Saidas_Vendas": [
-        "ID_Venda",
-        "Data",
-        "Prato_Vendido",
-        "Qtd_Vendida",
-    ],
-    "Ficha_Tecnica": [
-        "Prato",
-        "Insumo",
-        "Qtd_Insumo",
-        "Unidade",
+        "Forma_Pagamento",
+        "Valor",
+        "Link_Comprovante",
+        "Responsavel",
     ],
 }
 
-# Categorias Oficiais do Restaurante Mazon
+# Usuários Padrão Obrigatórios (RBAC)
+USUARIOS_PADRAO = [
+    ("Arthur", "Dev", "245716", "2026-11-01", "Sim"),
+    ("Claudio", "Gerente", "221016", "2026-11-01", "Sim"),
+    ("Caixa", "Caixa", "mazon123", "2026-11-01", "Sim"),
+    ("Equipe", "Equipe", "1234", "2026-11-01", "Sim"),
+]
+
+# Categorias Oficiais de Estoque do Restaurante Mazon
 CATEGORIAS_OFICIAIS = [
     "Proteínas e Frutos do Mar",
     "Hortifruti",
@@ -79,7 +95,30 @@ CATEGORIAS_OFICIAIS = [
     "Higiene e Limpeza",
 ]
 
-SESSION_DB_KEY = "mazon_db_oficial_zerado_v4"
+CATEGORIAS_FINANCEIRAS = [
+    "Faturamento Salão",
+    "Faturamento Delivery (iFood / Próprio)",
+    "Eventos & Reservas",
+    "Insumos - Proteínas e Pescados",
+    "Insumos - Mercearia e Hortifruti",
+    "Insumos - Embalagens e Descartáveis",
+    "Folha de Pagamento & Encargos",
+    "Aluguel, Energia, Água e Gás",
+    "Manutenção, Limpeza e Operacional",
+    "Impostos & Taxas de Cartão/Apps",
+]
+
+FORMAS_PAGAMENTO = [
+    "PIX",
+    "Cartão de Crédito",
+    "Cartão de Débito",
+    "Dinheiro",
+    "Boleto Faturado",
+    "Transferência TED",
+    "iFood / App Online",
+]
+
+SESSION_DB_KEY = "mazon_unified_db_v5"
 
 
 def calcular_status_estoque(qtd_atual: float, est_minimo: float, est_maximo: float = 0.0) -> str:
@@ -108,14 +147,28 @@ def calcular_status_estoque(qtd_atual: float, est_minimo: float, est_maximo: flo
 
 def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
     """
-    Popula todos os 90 insumos oficiais e suas 9 categorias do Restaurante Mazon,
-    com valores numéricos zerados para início da operação real:
-    - Qtd_Atual: 0.0
-    - Est_Minimo: 0.0
-    - Est_Maximo: 0.0
-    - Data_Ultima_Reposicao: "-"
-    - Status: "PENDENTE"
+    Inicializa as 4 abas da planilha unificada:
+    - Usuarios (4 perfis RBAC padrão)
+    - Logs_Auditoria
+    - Estoque (90 insumos oficiais do Restaurante Mazon)
+    - Financeiro (Estrutura pronta para filtros e DRE)
     """
+    df_usuarios = pd.DataFrame(USUARIOS_PADRAO, columns=SHEETS_SCHEMA["Usuarios"])
+
+    agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df_logs = pd.DataFrame(
+        [
+            (
+                agora_str,
+                "Sistema",
+                "Dev",
+                "Inicialização da estrutura unificada Mazon - Banco de Dados",
+                "Sistema",
+            )
+        ],
+        columns=SHEETS_SCHEMA["Logs_Auditoria"],
+    )
+
     catalogo_oficial = [
         # 1. Proteínas e Frutos do Mar (9 itens)
         ("Salmão", "Proteínas e Frutos do Mar", "kg"),
@@ -127,7 +180,6 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
         ("Kani", "Proteínas e Frutos do Mar", "pct"),
         ("Filé mignon", "Proteínas e Frutos do Mar", "kg"),
         ("Peito de frango", "Proteínas e Frutos do Mar", "kg"),
-
         # 2. Hortifruti (17 itens)
         ("Pepino japonês", "Hortifruti", "kg"),
         ("Cebola roxa", "Hortifruti", "kg"),
@@ -146,7 +198,6 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
         ("Coentro", "Hortifruti", "maço"),
         ("Gengibre", "Hortifruti", "kg"),
         ("Pimenta biquinho", "Hortifruti", "kg"),
-
         # 3. Grãos e Mercearia (15 itens)
         ("Arroz japonês", "Grãos e Mercearia", "kg"),
         ("Farinha panko", "Grãos e Mercearia", "kg"),
@@ -163,12 +214,10 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
         ("Amendoim", "Grãos e Mercearia", "kg"),
         ("Coco ralado", "Grãos e Mercearia", "kg"),
         ("Biscoito Maizena", "Grãos e Mercearia", "pct"),
-
         # 4. Alimentação dos Funcionários (3 itens)
         ("Arroz funcionário", "Alimentação dos Funcionários", "kg"),
         ("Feijão funcionário", "Alimentação dos Funcionários", "kg"),
         ("Café funcionário", "Alimentação dos Funcionários", "pct"),
-
         # 5. Laticínios e Refrigerados (6 itens)
         ("Ovo", "Laticínios e Refrigerados", "cartela"),
         ("Creme cheese", "Laticínios e Refrigerados", "kg"),
@@ -176,7 +225,6 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
         ("Leite em pó", "Laticínios e Refrigerados", "kg"),
         ("Creme de leite", "Laticínios e Refrigerados", "un"),
         ("Leite condensado", "Laticínios e Refrigerados", "un"),
-
         # 6. Japoneses e Condimentos (12 itens)
         ("Shoyu", "Japoneses e Condimentos", "L"),
         ("Saque culinário", "Japoneses e Condimentos", "L"),
@@ -190,7 +238,6 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
         ("Chimichurri", "Japoneses e Condimentos", "kg"),
         ("Azeitona", "Japoneses e Condimentos", "kg"),
         ("Palmito", "Japoneses e Condimentos", "vidro"),
-
         # 7. Doces e Confeitaria (6 itens)
         ("Doce de leite", "Doces e Confeitaria", "kg"),
         ("Sococo (Doce cremoso)", "Doces e Confeitaria", "un"),
@@ -198,7 +245,6 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
         ("Goiabada", "Doces e Confeitaria", "kg"),
         ("Goiabada líquida", "Doces e Confeitaria", "kg"),
         ("Barra de chocolate", "Doces e Confeitaria", "kg"),
-
         # 8. Embalagens e Descartáveis (12 itens)
         ("H01", "Embalagens e Descartáveis", "un"),
         ("H02", "Embalagens e Descartáveis", "un"),
@@ -212,7 +258,6 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
         ("Hashi", "Embalagens e Descartáveis", "par"),
         ("Nozoki", "Embalagens e Descartáveis", "un"),
         ("Palito", "Embalagens e Descartáveis", "cx"),
-
         # 9. Higiene e Limpeza (10 itens)
         ("Papel toalha", "Higiene e Limpeza", "pct"),
         ("Touca", "Higiene e Limpeza", "cx"),
@@ -237,66 +282,142 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
                 "Qtd_Atual": 0.0,
                 "Est_Minimo": 0.0,
                 "Est_Maximo": 0.0,
+                "Preco_Unitario": 0.0,
+                "Fornecedor": "-",
                 "Data_Ultima_Reposicao": "-",
                 "Status": "PENDENTE",
             }
         )
 
     df_estoque = pd.DataFrame(estoque_dicts, columns=SHEETS_SCHEMA["Estoque"])
-    df_precos = pd.DataFrame(columns=SHEETS_SCHEMA["Fornecedores_Precos"])
-    df_entradas = pd.DataFrame(columns=SHEETS_SCHEMA["Entradas_Compras"])
-    df_saidas = pd.DataFrame(columns=SHEETS_SCHEMA["Saidas_Vendas"])
-    df_ficha = pd.DataFrame(columns=SHEETS_SCHEMA["Ficha_Tecnica"])
+
+    hoje = datetime.now().strftime("%Y-%m-%d")
+    ontem = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    anteontem = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+
+    lancamentos_iniciais = [
+        (
+            "FIN-001",
+            anteontem,
+            "Receita",
+            "Faturamento Bruto",
+            "Fechamento Salão Jantar",
+            "Faturamento Salão",
+            "Cliente Final (Salão)",
+            "Cartão de Crédito",
+            6850.00,
+            "-",
+            "Caixa",
+        ),
+        (
+            "FIN-002",
+            anteontem,
+            "Despesa",
+            "Custo Variável",
+            "Compra de Salmão e Atum Fresco",
+            "Insumos - Proteínas e Pescados",
+            "Mar & Cia Imports",
+            "Boleto Faturado",
+            2840.00,
+            "https://drive.google.com/drive/folders/mazon-notas-fiscais",
+            "Claudio",
+        ),
+        (
+            "FIN-003",
+            ontem,
+            "Receita",
+            "Faturamento Bruto",
+            "Vendas Delivery Turno Noite",
+            "Faturamento Delivery (iFood / Próprio)",
+            "iFood / Delivery",
+            "PIX",
+            5420.00,
+            "-",
+            "Caixa",
+        ),
+        (
+            "FIN-004",
+            ontem,
+            "Despesa",
+            "Custo Variável",
+            "Reposição Embalagens H01/H02/Kraft",
+            "Insumos - Embalagens e Descartáveis",
+            "PackLux Embalagens",
+            "PIX",
+            980.00,
+            "https://drive.google.com/drive/folders/mazon-notas-fiscais",
+            "Claudio",
+        ),
+        (
+            "FIN-005",
+            hoje,
+            "Receita",
+            "Faturamento Bruto",
+            "Fechamento Parcial Caixa Dia",
+            "Faturamento Salão",
+            "Cliente Final (Salão)",
+            "PIX",
+            4910.00,
+            "-",
+            "Caixa",
+        ),
+        (
+            "FIN-006",
+            hoje,
+            "Despesa",
+            "Custo Fixo",
+            "Energia Elétrica e Gás Industrial",
+            "Aluguel, Energia, Água e Gás",
+            "Concessionária / Ultragaz",
+            "Boleto Faturado",
+            1650.00,
+            "https://drive.google.com/drive/folders/mazon-comprovantes",
+            "Arthur",
+        ),
+    ]
+    df_financeiro = pd.DataFrame(lancamentos_iniciais, columns=SHEETS_SCHEMA["Financeiro"])
 
     return {
+        "Usuarios": df_usuarios,
+        "Logs_Auditoria": df_logs,
         "Estoque": df_estoque,
-        "Fornecedores_Precos": df_precos,
-        "Entradas_Compras": df_entradas,
-        "Saidas_Vendas": df_saidas,
-        "Ficha_Tecnica": df_ficha,
+        "Financeiro": df_financeiro,
     }
 
 
 class MazonSheetsManager:
     """
-    Gerenciador de persistência híbrida (Google Sheets + Google Drive + Fallback em Sessão).
-    Garante que o sistema opere conectado à nuvem ou em modo local com o estoque oficial zerado.
+    Gerenciador Unificado do Banco de Dados no Google Sheets ("Mazon - Banco de Dados")
+    e Repositório Único de Arquivos no Google Drive com subpastas /Notas_Fiscais e /Comprovantes.
     """
 
     def __init__(
         self,
         credentials_path: str = "credentials.json",
-        spreadsheet_name: str = "Restaurante_Mazon_ERP_Database",
+        spreadsheet_name: str = "Mazon - Banco de Dados",
         spreadsheet_id: Optional[str] = None,
+        drive_main_folder_name: str = "Mazon - Documentos e Comprovantes",
     ) -> None:
         self.credentials_path = credentials_path
         self.spreadsheet_name = spreadsheet_name
         self.spreadsheet_id = spreadsheet_id or os.getenv("MAZON_SPREADSHEET_ID")
+        self.drive_main_folder_name = drive_main_folder_name
         self.client: Optional[gspread.Client] = None
         self.spreadsheet: Optional[gspread.Spreadsheet] = None
         self.drive_service: Any = None
         self.connected: bool = False
-        self.connection_message: str = "Base Oficial Mazon Ativa (90 insumos zerados)"
+        self.connection_message: str = "Banco Unificado Mazon Ativo"
 
         self._init_local_state()
         self._try_connect_cloud()
 
     def _init_local_state(self) -> None:
-        """
-        Força a limpeza do cache antigo de memória na primeira execução da nova versão
-        e inicializa os DataFrames com os valores zerados oficiais.
-        """
-        if "mazon_cache_reset_v3" not in st.session_state:
-            st.session_state.estoque_df = None
-            for chave_antiga in ["mazon_db", "mazon_db_oficial_v2"]:
-                st.session_state.pop(chave_antiga, None)
-            st.session_state[SESSION_DB_KEY] = _gerar_dados_iniciais()
-            st.session_state["mazon_cache_reset_v3"] = True
-        elif SESSION_DB_KEY not in st.session_state:
+        """Inicializa o banco unificado na sessão do Streamlit."""
+        if SESSION_DB_KEY not in st.session_state:
             st.session_state[SESSION_DB_KEY] = _gerar_dados_iniciais()
 
     def _try_connect_cloud(self) -> None:
-        """Tenta autenticar no Google Cloud via Service Account ou st.secrets."""
+        """Autentica no Google Cloud e abre/cria a planilha única 'Mazon - Banco de Dados'."""
         creds: Optional[Credentials] = None
 
         try:
@@ -309,14 +430,12 @@ class MazonSheetsManager:
                     dict(st.secrets["gcp_service_account"]), scopes=SCOPES
                 )
         except Exception as exc:
-            self.connection_message = f"Credenciais não carregadas ({exc})"
+            self.connection_message = f"Modo Local Ativo ({exc})"
             self.connected = False
             return
 
         if creds is None:
-            self.connection_message = (
-                "Base Oficial Zerada Ativa (Adicione 'credentials.json' para sincronizar na nuvem)."
-            )
+            self.connection_message = "Banco Unificado em Memória Ativo (Offline/Demo)"
             self.connected = False
             return
 
@@ -330,17 +449,25 @@ class MazonSheetsManager:
                 try:
                     self.spreadsheet = self.client.open(self.spreadsheet_name)
                 except gspread.SpreadsheetNotFound:
-                    self.spreadsheet = self.client.create(self.spreadsheet_name)
+                    try:
+                        # Tenta abrir a planilha anterior caso o usuário já a tenha compartilhado
+                        self.spreadsheet = self.client.open("Restaurante_Mazon_ERP_Database")
+                    except Exception:
+                        self.spreadsheet = self.client.create(self.spreadsheet_name)
 
             self._garantir_abas_obrigatorias()
             self.connected = True
-            self.connection_message = f"Conectado ao Google Sheets: {self.spreadsheet.title}"
+            self.connection_message = f"Planilha Unificada Online: {self.spreadsheet.title}"
         except Exception as exc:
             self.connected = False
-            self.connection_message = f"Modo Local Ativo (Aviso Google Cloud: {exc})"
+            self.connection_message = f"Operando em Cache Seguro (Aviso Cloud: {exc})"
 
     def _garantir_abas_obrigatorias(self) -> None:
-        """Verifica e cria automaticamente as 5 abas obrigatórias no Google Sheets com seus cabeçalhos."""
+        """
+        Verifica e inicializa automaticamente as 4 abas obrigatórias:
+        Usuarios, Logs_Auditoria, Estoque e Financeiro.
+        Garante também que os 4 usuários padrão existam na aba Usuarios.
+        """
         if not self.spreadsheet:
             return
 
@@ -349,7 +476,9 @@ class MazonSheetsManager:
 
         for nome_aba, colunas in SHEETS_SCHEMA.items():
             if nome_aba not in abas_existentes:
-                ws = self.spreadsheet.add_worksheet(title=nome_aba, rows=500, cols=len(colunas) + 2)
+                ws = self.spreadsheet.add_worksheet(
+                    title=nome_aba, rows=600, cols=len(colunas) + 2
+                )
                 df_seed = dados_iniciais[nome_aba]
                 valores = [colunas] + df_seed.astype(str).values.tolist()
                 ws.update(valores, value_input_option="USER_ENTERED")
@@ -361,8 +490,30 @@ class MazonSheetsManager:
                     valores = [colunas] + df_seed.astype(str).values.tolist()
                     ws.update(valores, value_input_option="USER_ENTERED")
 
+        # Garante que os 4 usuários padrão estejam presentes na aba Usuarios
+        try:
+            df_u = self.ler_aba("Usuarios")
+            usuarios_atuais = set(df_u["Usuario"].astype(str).str.strip().tolist())
+            novos_u = []
+            for u_nome, u_perf, u_senha, u_data, u_ativo in USUARIOS_PADRAO:
+                if u_nome not in usuarios_atuais:
+                    novos_u.append(
+                        {
+                            "Usuario": u_nome,
+                            "Perfil": u_perf,
+                            "Senha": u_senha,
+                            "Data_Cadastro": u_data,
+                            "Ativo": u_ativo,
+                        }
+                    )
+            if novos_u:
+                df_u = pd.concat([df_u, pd.DataFrame(novos_u)], ignore_index=True)
+                self.salvar_aba("Usuarios", df_u)
+        except Exception:
+            pass
+
     def ler_aba(self, nome_aba: str) -> pd.DataFrame:
-        """Lê uma das 5 abas do Google Sheets (ou do estado local se offline)."""
+        """Lê qualquer aba da planilha unificada com fallback automático em sessão."""
         colunas_esperadas = SHEETS_SCHEMA[nome_aba]
 
         if self.connected and self.spreadsheet:
@@ -374,7 +525,7 @@ class MazonSheetsManager:
                 df = pd.DataFrame(registros)
                 for col in colunas_esperadas:
                     if col not in df.columns:
-                        df[col] = ""
+                        df[col] = 0.0 if col in ["Preco_Unitario", "Valor"] else "-"
                 df = df[colunas_esperadas]
                 st.session_state[SESSION_DB_KEY][nome_aba] = df.copy()
                 return df
@@ -384,9 +535,13 @@ class MazonSheetsManager:
         return st.session_state[SESSION_DB_KEY][nome_aba].copy()
 
     def salvar_aba(self, nome_aba: str, df: pd.DataFrame) -> bool:
-        """Sobrescreve a aba de forma segura no estado local e sincroniza com o Google Sheets."""
+        """Salva um DataFrame na aba correspondente da planilha unificada."""
         colunas = SHEETS_SCHEMA[nome_aba]
-        df_limpo = df[colunas].copy()
+        df_limpo = df.copy()
+        for col in colunas:
+            if col not in df_limpo.columns:
+                df_limpo[col] = ""
+        df_limpo = df_limpo[colunas]
         st.session_state[SESSION_DB_KEY][nome_aba] = df_limpo
 
         if self.connected and self.spreadsheet:
@@ -397,44 +552,128 @@ class MazonSheetsManager:
                 ws.update(valores, value_input_option="USER_ENTERED")
                 return True
             except Exception as exc:
-                st.warning(f"Salvo localmente, mas houve falha ao sincronizar no Sheets: {exc}")
+                st.warning(f"Salvo localmente (Aviso de sincronização no Sheets: {exc})")
                 return False
         return True
 
-    def obter_estoque_enriquecido(self) -> pd.DataFrame:
-        """
-        Retorna a tabela 'Estoque' enriquecida com o último Preço Unitário de 'Fornecedores_Precos'
-        e o Valor Total em Estoque (R$) de cada item.
-        """
-        df_estoque = self.ler_aba("Estoque").copy()
-        df_precos = self.ler_aba("Fornecedores_Precos").copy()
+    # ==========================================================================
+    # AUTENTICAÇÃO E GESTÃO DE USUÁRIOS (ABA 'Usuarios')
+    # ==========================================================================
+    def autenticar_usuario(self, usuario: str, senha: str) -> Optional[Dict[str, str]]:
+        """Valida credenciais na aba 'Usuarios' e retorna dicionário {usuario, perfil} se válido."""
+        df_usuarios = self.ler_aba("Usuarios")
+        u_limpo = usuario.strip().lower()
+        s_limpa = str(senha).strip()
 
-        for col_num in ["Qtd_Atual", "Est_Minimo", "Est_Maximo"]:
+        for _, row in df_usuarios.iterrows():
+            if str(row.get("Ativo", "Sim")).strip().lower() == "não":
+                continue
+            if (
+                str(row["Usuario"]).strip().lower() == u_limpo
+                and str(row["Senha"]).strip() == s_limpa
+            ):
+                return {
+                    "usuario": str(row["Usuario"]).strip(),
+                    "perfil": str(row["Perfil"]).strip(),
+                }
+        return None
+
+    def cadastrar_ou_atualizar_usuario(
+        self, novo_usuario: str, perfil: str, senha: str, ativo: str = "Sim"
+    ) -> Tuple[bool, str]:
+        """Cadastra ou atualiza um usuário na aba 'Usuarios' (Exclusivo para perfil Dev)."""
+        df_u = self.ler_aba("Usuarios")
+        nome_limpo = novo_usuario.strip()
+        if not nome_limpo or not str(senha).strip():
+            return False, "Preencha usuário e senha."
+
+        hoje = datetime.now().strftime("%Y-%m-%d")
+        mascara = df_u["Usuario"].astype(str).str.lower() == nome_limpo.lower()
+
+        if mascara.any():
+            idx = df_u[mascara].index[0]
+            df_u.loc[idx, "Perfil"] = perfil
+            df_u.loc[idx, "Senha"] = str(senha).strip()
+            df_u.loc[idx, "Ativo"] = ativo
+            msg = f"Usuário '{nome_limpo}' atualizado para o perfil '{perfil}'."
+        else:
+            nova_linha = pd.DataFrame(
+                [
+                    {
+                        "Usuario": nome_limpo,
+                        "Perfil": perfil,
+                        "Senha": str(senha).strip(),
+                        "Data_Cadastro": hoje,
+                        "Ativo": ativo,
+                    }
+                ]
+            )
+            df_u = pd.concat([df_u, nova_linha], ignore_index=True)
+            msg = f"Novo usuário '{nome_limpo}' ({perfil}) cadastrado com sucesso."
+
+        ok = self.salvar_aba("Usuarios", df_u)
+        return ok, msg
+
+    # ==========================================================================
+    # AUDITORIA E LOGS DE OPERAÇÕES (ABA 'Logs_Auditoria')
+    # ==========================================================================
+    def registrar_log(self, usuario: str, perfil: str, acao: str, modulo: str) -> bool:
+        """
+        Grava automaticamente um evento na aba 'Logs_Auditoria' do Sheets com as colunas:
+        Data_Hora | Usuario | Perfil | Acao | Modulo.
+        """
+        agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        novo_registro = {
+            "Data_Hora": agora,
+            "Usuario": str(usuario),
+            "Perfil": str(perfil),
+            "Acao": str(acao),
+            "Modulo": str(modulo),
+        }
+
+        df_logs = st.session_state[SESSION_DB_KEY]["Logs_Auditoria"].copy()
+        df_logs = pd.concat([df_logs, pd.DataFrame([novo_registro])], ignore_index=True)
+        st.session_state[SESSION_DB_KEY]["Logs_Auditoria"] = df_logs
+
+        if self.connected and self.spreadsheet:
+            try:
+                ws = self.spreadsheet.worksheet("Logs_Auditoria")
+                ws.append_row(
+                    [
+                        novo_registro["Data_Hora"],
+                        novo_registro["Usuario"],
+                        novo_registro["Perfil"],
+                        novo_registro["Acao"],
+                        novo_registro["Modulo"],
+                    ],
+                    value_input_option="USER_ENTERED",
+                )
+                return True
+            except Exception:
+                return False
+        return True
+
+    # ==========================================================================
+    # GESTÃO DE ESTOQUE UNIFICADA (ABA 'Estoque')
+    # ==========================================================================
+    def obter_estoque_enriquecido(self) -> pd.DataFrame:
+        """Retorna a tabela 'Estoque' com cálculo numérico de Status e Valor Total."""
+        df_estoque = self.ler_aba("Estoque").copy()
+
+        for col_num in ["Qtd_Atual", "Est_Minimo", "Est_Maximo", "Preco_Unitario"]:
+            if col_num not in df_estoque.columns:
+                df_estoque[col_num] = 0.0
             df_estoque[col_num] = pd.to_numeric(df_estoque[col_num], errors="coerce").fillna(0.0)
+
+        if "Fornecedor" not in df_estoque.columns:
+            df_estoque["Fornecedor"] = "-"
 
         df_estoque["Status"] = df_estoque.apply(
             lambda r: calcular_status_estoque(r["Qtd_Atual"], r["Est_Minimo"], r["Est_Maximo"]),
             axis=1,
         )
-
-        if not df_precos.empty:
-            df_precos["Preco_Unitario"] = pd.to_numeric(
-                df_precos["Preco_Unitario"], errors="coerce"
-            ).fillna(0.0)
-            df_precos_ord = df_precos.sort_values("Data_Registro", ascending=False)
-            ultimos_precos = (
-                df_precos_ord.groupby("Insumo", as_index=False)["Preco_Unitario"]
-                .first()
-                .rename(columns={"Insumo": "Item", "Preco_Unitario": "Ultimo_Preco_Unitario"})
-            )
-            df_estoque = df_estoque.merge(ultimos_precos, on="Item", how="left")
-            df_estoque["Ultimo_Preco_Unitario"] = df_estoque["Ultimo_Preco_Unitario"].fillna(0.0)
-        else:
-            df_estoque["Ultimo_Preco_Unitario"] = 0.0
-
-        df_estoque["Valor_Total_Item"] = (
-            df_estoque["Qtd_Atual"] * df_estoque["Ultimo_Preco_Unitario"]
-        )
+        df_estoque["Ultimo_Preco_Unitario"] = df_estoque["Preco_Unitario"]
+        df_estoque["Valor_Total_Item"] = df_estoque["Qtd_Atual"] * df_estoque["Preco_Unitario"]
         return df_estoque
 
     def cadastrar_ou_atualizar_item_estoque(
@@ -447,9 +686,9 @@ class MazonSheetsManager:
         est_minimo: float,
         est_maximo: float,
         preco_referencia: Optional[float] = None,
-        fornecedor_referencia: str = "Cadastro Direto",
+        fornecedor_referencia: str = "-",
     ) -> Tuple[bool, str]:
-        """Cadastra novo insumo ou atualiza um existente sincronizando com o Google Sheets."""
+        """Cadastra novo insumo ou atualiza um existente sincronizando com a aba 'Estoque'."""
         df_estoque = self.ler_aba("Estoque")
         hoje = datetime.now().strftime("%Y-%m-%d")
         novo_status = calcular_status_estoque(qtd_atual, est_minimo, est_maximo)
@@ -470,9 +709,13 @@ class MazonSheetsManager:
             df_estoque.loc[idx, "Qtd_Atual"] = float(qtd_atual)
             df_estoque.loc[idx, "Est_Minimo"] = float(est_minimo)
             df_estoque.loc[idx, "Est_Maximo"] = float(est_maximo)
+            if preco_referencia is not None:
+                df_estoque.loc[idx, "Preco_Unitario"] = float(preco_referencia)
+            if fornecedor_referencia and fornecedor_referencia != "-":
+                df_estoque.loc[idx, "Fornecedor"] = fornecedor_referencia.strip()
             df_estoque.loc[idx, "Data_Ultima_Reposicao"] = hoje
             df_estoque.loc[idx, "Status"] = novo_status
-            acao_msg = f"Insumo '{nome_item}' ({df_estoque.loc[idx, 'ID']}) atualizado com sucesso!"
+            acao_msg = f"Insumo '{nome_item}' ({df_estoque.loc[idx, 'ID']}) atualizado no estoque."
         else:
             nova_linha = pd.DataFrame(
                 [
@@ -484,67 +727,160 @@ class MazonSheetsManager:
                         "Qtd_Atual": float(qtd_atual),
                         "Est_Minimo": float(est_minimo),
                         "Est_Maximo": float(est_maximo),
+                        "Preco_Unitario": float(preco_referencia or 0.0),
+                        "Fornecedor": fornecedor_referencia.strip() or "-",
                         "Data_Ultima_Reposicao": hoje,
                         "Status": novo_status,
                     }
                 ]
             )
             df_estoque = pd.concat([df_estoque, nova_linha], ignore_index=True)
-            acao_msg = f"Novo insumo '{nome_item}' ({item_id}) cadastrado com sucesso!"
+            acao_msg = f"Novo insumo '{nome_item}' ({item_id}) cadastrado no estoque."
 
         ok = self.salvar_aba("Estoque", df_estoque)
-
-        if preco_referencia and preco_referencia > 0:
-            self.registrar_preco_fornecedor(
-                insumo=nome_item.strip(),
-                fornecedor=fornecedor_referencia,
-                preco_unitario=preco_referencia,
-                unidade=unidade,
-                data_registro=hoje,
-            )
-
         return ok, acao_msg
 
-    def registrar_preco_fornecedor(
+    # ==========================================================================
+    # GESTÃO FINANCEIRA UNIFICADA (ABA 'Financeiro')
+    # ==========================================================================
+    def registrar_lancamento_financeiro(
         self,
-        insumo: str,
+        data_lancamento: str,
+        tipo: str,
+        natureza_custo: str,
+        descricao: str,
+        categoria: str,
         fornecedor: str,
-        preco_unitario: float,
-        unidade: str,
-        data_registro: Optional[str] = None,
-    ) -> bool:
-        """Adiciona cotação ou preço de compra na aba 'Fornecedores_Precos'."""
-        df_precos = self.ler_aba("Fornecedores_Precos")
-        novo_id = f"FP-{len(df_precos) + 1:03d}"
-        data_str = data_registro or datetime.now().strftime("%Y-%m-%d")
+        forma_pagamento: str,
+        valor: float,
+        link_comprovante: str,
+        responsavel: str,
+    ) -> Tuple[bool, str]:
+        """Grava um lançamento financeiro (Receita ou Despesa) na aba 'Financeiro'."""
+        df_fin = self.ler_aba("Financeiro")
+        novo_id = f"FIN-{len(df_fin) + 1:03d}-{datetime.now().strftime('%H%M%S')}"
 
-        nova_cotacao = pd.DataFrame(
+        nova_linha = pd.DataFrame(
             [
                 {
-                    "ID": novo_id,
-                    "Insumo": insumo.strip(),
-                    "Fornecedor": fornecedor.strip(),
-                    "Preco_Unitario": round(float(preco_unitario), 2),
-                    "Unidade": unidade.strip(),
-                    "Data_Registro": data_str,
+                    "ID_Lancamento": novo_id,
+                    "Data": data_lancamento,
+                    "Tipo": tipo,
+                    "Natureza_Custo": natureza_custo,
+                    "Descricao": descricao.strip() or categoria,
+                    "Categoria": categoria,
+                    "Fornecedor": fornecedor.strip() or "-",
+                    "Forma_Pagamento": forma_pagamento,
+                    "Valor": round(float(valor), 2),
+                    "Link_Comprovante": link_comprovante or "-",
+                    "Responsavel": responsavel,
                 }
             ]
         )
-        df_precos = pd.concat([df_precos, nova_cotacao], ignore_index=True)
-        return self.salvar_aba("Fornecedores_Precos", df_precos)
+        df_fin = pd.concat([df_fin, nova_linha], ignore_index=True)
+        ok = self.salvar_aba("Financeiro", df_fin)
+        return ok, novo_id
+
+    def excluir_lancamento_financeiro(
+        self, id_lancamento: str, usuario_logado: str, perfil_logado: str
+    ) -> Tuple[bool, str]:
+        """
+        TRAVA RIGOROSA DE EXCLUSÃO:
+        Permite excluir lançamentos financeiros ou notas fiscais EXCLUSIVAMENTE quando
+        usuario_logado == 'Arthur' (Perfil Dev).
+        """
+        if str(usuario_logado).strip() != "Arthur":
+            self.registrar_log(
+                usuario=usuario_logado,
+                perfil=perfil_logado,
+                acao=f"TENTATIVA BLOQUEADA de exclusão do lançamento {id_lancamento}",
+                modulo="Financeiro",
+            )
+            return False, "Acesso Negado: Apenas o usuário 'Arthur' (Dev) possui permissão de exclusão."
+
+        df_fin = self.ler_aba("Financeiro")
+        mascara = df_fin["ID_Lancamento"].astype(str) == str(id_lancamento).strip()
+        if not mascara.any():
+            return False, f"Lançamento '{id_lancamento}' não encontrado."
+
+        df_fin = df_fin[~mascara].reset_index(drop=True)
+        ok = self.salvar_aba("Financeiro", df_fin)
+        self.registrar_log(
+            usuario=usuario_logado,
+            perfil=perfil_logado,
+            acao=f"Exclusão definitiva do lançamento/NF {id_lancamento}",
+            modulo="Financeiro",
+        )
+        return ok, f"Lançamento '{id_lancamento}' excluído com sucesso por Arthur (Dev)."
+
+    # ==========================================================================
+    # PASTA ÚNICA NO GOOGLE DRIVE COM SUBPASTAS /Notas_Fiscais E /Comprovantes
+    # ==========================================================================
+    def _obter_ou_criar_pasta_drive(self, nome_pasta: str, parent_id: Optional[str] = None) -> Optional[str]:
+        """Busca ou cria automaticamente uma pasta no Google Drive retornando seu ID."""
+        if not (self.connected and self.drive_service):
+            return None
+
+        try:
+            q_parts = [
+                f"name = '{nome_pasta}'",
+                "mimeType = 'application/vnd.google-apps.folder'",
+                "trashed = false",
+            ]
+            if parent_id:
+                q_parts.append(f"'{parent_id}' in parents")
+
+            query = " and ".join(q_parts)
+            res = (
+                self.drive_service.files()
+                .list(q=query, spaces="drive", fields="files(id, name)", pageSize=1)
+                .execute()
+            )
+            arquivos = res.get("files", [])
+            if arquivos:
+                return arquivos[0]["id"]
+
+            meta: Dict[str, Any] = {
+                "name": nome_pasta,
+                "mimeType": "application/vnd.google-apps.folder",
+            }
+            if parent_id:
+                meta["parents"] = [parent_id]
+
+            pasta_criada = (
+                self.drive_service.files().create(body=meta, fields="id").execute()
+            )
+            return pasta_criada.get("id")
+        except Exception:
+            return None
 
     def upload_arquivo_drive(
-        self, arquivo_bytes: bytes, nome_arquivo: str, mime_type: str, folder_id: Optional[str] = None
+        self,
+        arquivo_bytes: bytes,
+        nome_arquivo: str,
+        mime_type: str,
+        subpasta: str = "Notas_Fiscais",
     ) -> str:
         """
-        Envia PDF/Imagem de Nota Fiscal ou Extrato para o Google Drive.
-        Retorna o link compartilhável (webViewLink) ou URI simulada em modo Demo.
+        Envia Nota Fiscal ou Comprovante para UMA ÚNICA PASTA PRINCIPAL no Google Drive,
+        organizando automaticamente nas subpastas /Notas_Fiscais ou /Comprovantes.
         """
+        subpasta_limpa = subpasta.strip("/")
         if self.connected and self.drive_service:
             try:
+                id_pasta_principal = os.getenv("MAZON_DRIVE_FOLDER_ID") or self._obter_ou_criar_pasta_drive(
+                    self.drive_main_folder_name
+                )
+                id_subpasta = self._obter_ou_criar_pasta_drive(
+                    subpasta_limpa, parent_id=id_pasta_principal
+                )
+
                 metadata: Dict[str, Any] = {"name": nome_arquivo}
-                if folder_id:
-                    metadata["parents"] = [folder_id]
+                if id_subpasta:
+                    metadata["parents"] = [id_subpasta]
+                elif id_pasta_principal:
+                    metadata["parents"] = [id_pasta_principal]
+
                 media = MediaIoBaseUpload(
                     io.BytesIO(arquivo_bytes), mimetype=mime_type, resumable=False
                 )
@@ -557,53 +893,19 @@ class MazonSheetsManager:
                     "webViewLink", f"https://drive.google.com/file/d/{created.get('id')}"
                 )
             except Exception as exc:
-                return f"https://drive.google.com/local-fallback/{nome_arquivo} (Aviso: {exc})"
+                return f"https://drive.google.com/drive/folders/{subpasta_limpa}/{nome_arquivo} (Local: {exc})"
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"https://drive.google.com/drive/u/0/mazon-notas/{timestamp}_{nome_arquivo}"
+        return f"https://drive.google.com/drive/u/0/Mazon_Principal/{subpasta_limpa}/{timestamp}_{nome_arquivo}"
 
 
-# ==============================================================================
-# ESTRUTURA PREPARADA PARA FASE 2: OCR / VISÃO COMPUTACIONAL (GEMINI / CLOUD VISION)
-# ==============================================================================
-def processar_documento_ocr_ia(
-    arquivo_bytes: bytes,
-    nome_arquivo: str,
-    tipo_documento: str,
-) -> Dict[str, Any]:
+def registrar_log(usuario: str, perfil: str, acao: str, modulo: str) -> bool:
     """
-    Hook estruturado para a Fase 2 (Integração Google Cloud Vision / Gemini Flash Vision).
-    Recebe os bytes da imagem/PDF, executa o pipeline de pré-processamento e retorna
-    o payload estruturado para aprovação e gravação nas abas 'Entradas_Compras' ou 'Saidas_Vendas'.
+    Função auxiliar global que grava automaticamente na aba 'Logs_Auditoria' do Sheets
+    com as colunas: Data_Hora, Usuario, Perfil, Acao, Modulo.
     """
-    tamanho_kb = round(len(arquivo_bytes) / 1024, 2)
-    agora = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    if tipo_documento == "Nota Fiscal / Cupom de Compra":
-        return {
-            "status_pipeline": "PRONTO_PARA_FASE_2_OCR",
-            "documento": nome_arquivo,
-            "tamanho_kb": tamanho_kb,
-            "processado_em": agora,
-            "aba_destino": "Entradas_Compras + Estoque + Fornecedores_Precos",
-            "campos_extraidos_preview": {
-                "ID_Nota": f"NF-AUTO-{datetime.now().strftime('%H%M')}",
-                "Data": datetime.now().strftime("%Y-%m-%d"),
-                "Fornecedor": "Aguardando leitura OCR Fase 2",
-                "Valor_Total": 0.0,
-                "Itens_Detectados": [],
-            },
-        }
-
-    return {
-        "status_pipeline": "PRONTO_PARA_FASE_2_OCR",
-        "documento": nome_arquivo,
-        "tamanho_kb": tamanho_kb,
-        "processado_em": agora,
-        "aba_destino": "Saidas_Vendas + Baixa via Ficha_Tecnica",
-        "campos_extraidos_preview": {
-            "ID_Venda": f"VD-AUTO-{datetime.now().strftime('%H%M')}",
-            "Data": datetime.now().strftime("%Y-%m-%d"),
-            "Pratos_Extraidos": [],
-        },
-    }
+    db_instance = st.session_state.get("_mazon_db_instance")
+    if db_instance is None:
+        db_instance = MazonSheetsManager()
+        st.session_state["_mazon_db_instance"] = db_instance
+    return db_instance.registrar_log(usuario=usuario, perfil=perfil, acao=acao, modulo=modulo)

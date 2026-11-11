@@ -1,18 +1,19 @@
 """
-RESTAURANTE MAZON - Sistema Automatizado de Gestão de Estoque e Inteligência Financeira
-FASE 1: Arquitetura em Nuvem (Google Sheets & Drive), Identidade Luxury Minimalist UI (Poppins)
-e 5 Módulos Operacionais.
+RESTAURANTE MAZON - Web App Unificado de Gestão de Estoque, Inteligência Financeira, RBAC e Auditoria
+Banco de Dados Centralizado em Planilha Única no Google Sheets ("Mazon - Banco de Dados")
+e Upload de Documentos em Pasta Única no Google Drive (/Notas_Fiscais e /Comprovantes).
 """
 
 from __future__ import annotations
 
 import io
 import os
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from PIL import Image
 from reportlab.lib import colors
@@ -29,9 +30,11 @@ from reportlab.platypus import (
 )
 
 from sheets_manager import (
+    CATEGORIAS_FINANCEIRAS,
     CATEGORIAS_OFICIAIS,
+    FORMAS_PAGAMENTO,
     MazonSheetsManager,
-    processar_documento_ocr_ia,
+    registrar_log,
 )
 
 
@@ -39,12 +42,11 @@ def resolver_caminho_recurso(nome_arquivo: str) -> str:
     """Retorna o caminho válido do arquivo no diretório atual ou no pacote."""
     if os.path.exists(nome_arquivo):
         return nome_arquivo
-    caminho_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), nome_arquivo)
-    return caminho_script
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), nome_arquivo)
 
 
 # ==============================================================================
-# CONFIGURAÇÃO DA PÁGINA E INJEÇÃO DE CSS (LUXURY MINIMALIST UI)
+# CONFIGURAÇÃO DA PÁGINA E FAVICON (logo2.png)
 # ==============================================================================
 _icone_aba = Image.open("logo2.png")
 
@@ -54,11 +56,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# Força a limpeza do cache de memória na primeira execução da sessão
-if "init_estoque_reset" not in st.session_state:
-    st.session_state.estoque_df = None
-    st.session_state["init_estoque_reset"] = True
 
 
 def obter_caminho_logo() -> Optional[str]:
@@ -80,8 +77,8 @@ def obter_caminho_logo() -> Optional[str]:
 
 def injetar_estilo_luxury_minimalist() -> None:
     """
-    Injeta a fonte Google Fonts Poppins restrita APENAS a elementos de texto explícitos,
-    protege integralmente os ícones Material do Streamlit e aplica o style.css.
+    Injeta a fonte Google Fonts Poppins restrita a elementos de texto,
+    protege os ícones Material do Streamlit e aplica o style.css.
     """
     regras_fonte_e_icones = (
         "<style>"
@@ -96,30 +93,6 @@ def injetar_estilo_luxury_minimalist() -> None:
         "font-family: 'Material Symbols Outlined', 'Material Symbols Rounded', 'Material Icons' !important;"
         "font-weight: normal !important;"
         "font-style: normal !important;"
-        "}"
-        "/* Esconde totalmente a bolinha/círculo do st.radio */"
-        "div[data-testid='stRadioButton'] label > div:first-child, "
-        "div[data-testid='stRadio'] label > div:first-child, "
-        "section[data-testid='stSidebar'] div[role='radiogroup'] label > div:first-child {"
-        "display: none !important;"
-        "}"
-        "/* Ajusta o espaçamento dos itens do menu */"
-        "div[data-testid='stRadioButton'] label, "
-        "div[data-testid='stRadio'] label, "
-        "section[data-testid='stSidebar'] div[role='radiogroup'] label {"
-        "cursor: pointer; padding: 6px 10px; border-radius: 6px; transition: background-color 0.2s ease;"
-        "}"
-        "/* Efeito hover nos itens */"
-        "div[data-testid='stRadioButton'] label:hover, "
-        "div[data-testid='stRadio'] label:hover, "
-        "section[data-testid='stSidebar'] div[role='radiogroup'] label:hover {"
-        "background-color: rgba(255, 255, 255, 0.05);"
-        "}"
-        "/* Gira a seta '›' em 90 graus para baixo quando o item estiver selecionado */"
-        "div[data-testid='stRadioButton'] label:has(input:checked), "
-        "div[data-testid='stRadio'] label:has(input:checked), "
-        "section[data-testid='stSidebar'] div[role='radiogroup'] label:has(input:checked) {"
-        "font-weight: bold;"
         "}"
         "</style>"
     )
@@ -164,8 +137,10 @@ label[data-baseweb="radio"]:has(input:checked) {
 
 injetar_estilo_luxury_minimalist()
 
-# Inicializa o Gerenciador de Banco de Dados Google Sheets / Drive
-db = MazonSheetsManager()
+# Inicializa o Gerenciador Unificado Google Sheets / Drive
+if "_mazon_db_instance" not in st.session_state:
+    st.session_state["_mazon_db_instance"] = MazonSheetsManager()
+db: MazonSheetsManager = st.session_state["_mazon_db_instance"]
 
 
 def formatar_moeda(valor: float) -> str:
@@ -185,12 +160,7 @@ def renderizar_badge_status(status: str) -> str:
 
 
 def gerar_pdf_lista_compras(df_compras: pd.DataFrame, custo_total_compra: float) -> bytes:
-    """
-    Gera o relatório em PDF (via ReportLab) harmonizado na paleta Luxury Cream & Deep Navy:
-    - Fundo de página suave (#FAF6F0) e faixa superior em Azul Marinho (#0B1B2B)
-    - Imagem da logo oficial no topo via Image(caminho_logo, width=140, height=90)
-    - Cabeçalhos de tabela em Azul Marinho (#0B1B2B) com texto Creme (#F4EDE3) e linhas em creme/dourado.
-    """
+    """Gera o relatório em PDF (ReportLab) harmonizado na paleta Luxury Cream & Deep Navy."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -203,7 +173,6 @@ def gerar_pdf_lista_compras(df_compras: pd.DataFrame, custo_total_compra: float)
     )
 
     def _decorar_pagina_pdf(canvas_obj, doc_obj) -> None:
-        """Aplica fundo creme suave (#FAF6F0), borda superior marinho (#0B1B2B) e filete dourado (#D4A24C)."""
         canvas_obj.saveState()
         largura_pag, altura_pag = A4
 
@@ -351,11 +320,77 @@ def gerar_pdf_lista_compras(df_compras: pd.DataFrame, custo_total_compra: float)
 
 
 # ==============================================================================
-# MENU LATERAL (SIDEBAR MINIMALISTA #0B1B2B COM LOGO INTEGRADA E SETAS)
+# ESTADO DE AUTENTICAÇÃO E TELA DE LOGIN INICIAL (BLOQUEIO TOTAL ANTES DO LOGIN)
 # ==============================================================================
-caminho_logo = obter_caminho_logo()
-if caminho_logo:
-    st.sidebar.image(caminho_logo, use_container_width=True)
+if "autenticado" not in st.session_state:
+    st.session_state["autenticado"] = False
+if "usuario" not in st.session_state:
+    st.session_state["usuario"] = None
+if "perfil" not in st.session_state:
+    st.session_state["perfil"] = None
+
+
+def renderizar_tela_login() -> None:
+    """Renderiza a tela central de autenticação bloqueando qualquer conteúdo antes do login."""
+    _, col_centro, _ = st.columns([1.2, 1.4, 1.2])
+    with col_centro:
+        st.markdown("<div style='height: 36px;'></div>", unsafe_allow_html=True)
+        caminho_logo = obter_caminho_logo()
+        if caminho_logo:
+            _, c_img, _ = st.columns([1, 2, 1])
+            with c_img:
+                st.image(caminho_logo, use_container_width=True)
+
+        st.markdown(
+            '<div class="mazon-login-box">'
+            '<h2 style="margin:0 0 4px 0; color:#0B1B2B; font-size:1.45rem;">Acesso Restrito — Restaurante Mazon</h2>'
+            '<p style="color:#687787; font-size:0.86rem; margin-bottom:0;">Insira suas credenciais para acessar o Sistema Unificado de Estoque &amp; Inteligência Financeira</p>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        with st.form("form_login_mazon", clear_on_submit=False):
+            in_usuario = st.text_input("Usuário", placeholder="Ex: Arthur, Claudio, Caixa, Equipe")
+            in_senha = st.text_input("Senha", type="password", placeholder="Digite sua senha")
+            btn_entrar = st.form_submit_button("Entrar no Sistema", use_container_width=True)
+
+            if btn_entrar:
+                dados_auth = db.autenticar_usuario(in_usuario, in_senha)
+                if dados_auth:
+                    st.session_state["autenticado"] = True
+                    st.session_state["usuario"] = dados_auth["usuario"]
+                    st.session_state["perfil"] = dados_auth["perfil"]
+                    registrar_log(
+                        usuario=dados_auth["usuario"],
+                        perfil=dados_auth["perfil"],
+                        acao=f"Login realizado com sucesso no sistema ({dados_auth['perfil']})",
+                        modulo="Autenticacao",
+                    )
+                    st.rerun()
+                else:
+                    registrar_log(
+                        usuario=in_usuario.strip() or "Desconhecido",
+                        perfil="Nao_Autenticado",
+                        acao=f"Tentativa falha de login para o usuário '{in_usuario}'",
+                        modulo="Autenticacao",
+                    )
+                    st.error("Usuário ou senha inválidos. Verifique suas credenciais.")
+
+
+if not st.session_state["autenticado"]:
+    renderizar_tela_login()
+    st.stop()
+
+
+# ==============================================================================
+# USUÁRIO AUTENTICADO: VARIÁVEIS DE SESSÃO E SIDEBAR
+# ==============================================================================
+USUARIO_ATUAL: str = str(st.session_state["usuario"])
+PERFIL_ATUAL: str = str(st.session_state["perfil"])
+
+caminho_logo_sb = obter_caminho_logo()
+if caminho_logo_sb:
+    st.sidebar.image(caminho_logo_sb, use_container_width=True)
 else:
     st.sidebar.markdown(
         '<div style="text-align: center; padding: 10px 0 16px 0;">'
@@ -366,37 +401,43 @@ else:
     )
 
 with st.sidebar:
+    # Identificação do Usuário Logado e Botão Sair (Logout)
     st.markdown(
-        '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.5px; color:#D4A24C; font-weight:500; margin: 6px 0 8px 16px; opacity:0.85;">Navegação</p>',
-        unsafe_allow_html=True,
-    )
-    pagina_selecionada = st.radio(
-        label="Módulos do Sistema",
-        options=[
-            "› Dashboard Principal",
-            "› Gestão e Tabela de Estoque",
-            "› Comparativo de Preços",
-            "› Central OCR / IA",
-            "› Gerador de Lista de Compras",
-        ],
-        label_visibility="collapsed",
-    )
-
-    st.markdown('<hr style="border-color: rgba(255,255,255,0.07); margin: 18px 0;">', unsafe_allow_html=True)
-
-    # Status Minimalista da Conexão Google Cloud
-    cor_status_nuvem = "#1F9D55" if db.connected else "#D4A24C"
-    titulo_nuvem = "Google Sheets Online" if db.connected else "Estoque Oficial Ativo"
-    st.markdown(
-        f'<div style="padding: 8px 14px; margin-bottom: 12px; border-left: 2px solid {cor_status_nuvem};">'
-        f'<div style="font-size: 0.74rem; font-weight: 500; color: {cor_status_nuvem}; letter-spacing: 0.5px;">● {titulo_nuvem}</div>'
-        f'<div style="font-size: 0.72rem; color: #C5D1DE; opacity: 0.75; margin-top: 3px;">{db.connection_message}</div>'
+        f'<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(212,162,76,0.35); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;">'
+        f'<div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #D4A24C;">Sessão Ativa · Perfil {PERFIL_ATUAL}</div>'
+        f'<div style="font-size: 1.02rem; font-weight: 600; color: #F4EDE3; margin-top: 2px;">👤 {USUARIO_ATUAL}</div>'
         "</div>",
         unsafe_allow_html=True,
     )
 
+    if st.button("🚪 Sair (Logout)", use_container_width=True):
+        registrar_log(
+            usuario=USUARIO_ATUAL,
+            perfil=PERFIL_ATUAL,
+            acao="Logout realizado pelo usuário",
+            modulo="Autenticacao",
+        )
+        st.session_state["autenticado"] = False
+        st.session_state["usuario"] = None
+        st.session_state["perfil"] = None
+        st.rerun()
+
+    st.markdown('<hr style="border-color: rgba(255,255,255,0.08); margin: 14px 0;">', unsafe_allow_html=True)
+
+    # Status da Conexão Google Cloud
+    cor_status_nuvem = "#1F9D55" if db.connected else "#D4A24C"
+    titulo_nuvem = "Mazon - Banco de Dados Online" if db.connected else "Banco Unificado Ativo"
     st.markdown(
-        '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#D4A24C; font-weight:500; margin: 12px 0 6px 14px; opacity:0.85;">Ajuste Rápido</p>',
+        f'<div style="padding: 8px 12px; margin-bottom: 12px; border-left: 2px solid {cor_status_nuvem};">'
+        f'<div style="font-size: 0.74rem; font-weight: 500; color: {cor_status_nuvem};">● {titulo_nuvem}</div>'
+        f'<div style="font-size: 0.71rem; color: #C5D1DE; opacity: 0.78; margin-top: 2px;">{db.connection_message}</div>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Ajuste Rápido de Contagem de Estoque na Sidebar
+    st.markdown(
+        '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#D4A24C; font-weight:500; margin: 10px 0 6px 4px; opacity:0.9;">⚡ Movimento Rápido de Estoque</p>',
         unsafe_allow_html=True,
     )
     df_est_sidebar = db.ler_aba("Estoque")
@@ -405,14 +446,15 @@ with st.sidebar:
         item_rapido = st.selectbox("Insumo", options=opcoes_itens, key="sb_item_rapido")
         linha_atual = df_est_sidebar[df_est_sidebar["Item"] == item_rapido].iloc[0]
         nova_qtd_rapida = st.number_input(
-            f"Quantidade ({linha_atual['Unidade']})",
+            f"Saldo Atual ({linha_atual['Unidade']})",
             min_value=0.0,
             value=float(linha_atual["Qtd_Atual"]),
             step=0.5,
             key="sb_qtd_rapida",
         )
-        if st.button("Sincronizar Quantidade", use_container_width=True):
-            ok, msg = db.cadastrar_ou_atualizar_item_estoque(
+        if st.button("Sincronizar Saldo", use_container_width=True):
+            qtd_anterior = float(linha_atual["Qtd_Atual"])
+            ok, _ = db.cadastrar_ou_atualizar_item_estoque(
                 item_id=str(linha_atual["ID"]),
                 nome_item=str(linha_atual["Item"]),
                 categoria=str(linha_atual["Categoria"]),
@@ -420,151 +462,248 @@ with st.sidebar:
                 qtd_atual=nova_qtd_rapida,
                 est_minimo=float(linha_atual["Est_Minimo"]),
                 est_maximo=float(linha_atual["Est_Maximo"]),
+                preco_referencia=float(linha_atual.get("Preco_Unitario", 0.0)),
+                fornecedor_referencia=str(linha_atual.get("Fornecedor", "-")),
             )
             if ok:
+                registrar_log(
+                    usuario=USUARIO_ATUAL,
+                    perfil=PERFIL_ATUAL,
+                    acao=f"Atualização rápida de estoque: '{item_rapido}' de {qtd_anterior} para {nova_qtd_rapida} {linha_atual['Unidade']}",
+                    modulo="Estoque",
+                )
                 st.success("Estoque atualizado!")
                 st.rerun()
 
+    # EXCLUSIVO PARA PERFIL DEV (Arthur): Gestão e Cadastro de Usuários na Sidebar
+    if PERFIL_ATUAL == "Dev" and USUARIO_ATUAL == "Arthur":
+        st.markdown('<hr style="border-color: rgba(255,255,255,0.08); margin: 14px 0;">', unsafe_allow_html=True)
+        st.markdown(
+            '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#D4A24C; font-weight:600; margin: 6px 0 8px 4px;">🔐 Gestão de Usuários (Dev)</p>',
+            unsafe_allow_html=True,
+        )
+        with st.form("form_gestao_usuarios_dev", clear_on_submit=True):
+            novo_u_nome = st.text_input("Nome do Usuário", placeholder="Ex: Marina")
+            novo_u_perfil = st.selectbox("Perfil de Acesso", options=["Dev", "Gerente", "Caixa", "Equipe"])
+            novo_u_senha = st.text_input("Senha de Acesso", type="password")
+            novo_u_ativo = st.selectbox("Status", options=["Sim", "Não"])
+            if st.form_submit_button("Salvar Usuário", use_container_width=True):
+                ok_u, msg_u = db.cadastrar_ou_atualizar_usuario(
+                    novo_usuario=novo_u_nome,
+                    perfil=novo_u_perfil,
+                    senha=novo_u_senha,
+                    ativo=novo_u_ativo,
+                )
+                if ok_u:
+                    registrar_log(
+                        usuario=USUARIO_ATUAL,
+                        perfil=PERFIL_ATUAL,
+                        acao=f"Cadastro/atualização de usuário '{novo_u_nome}' com perfil '{novo_u_perfil}' (Ativo={novo_u_ativo})",
+                        modulo="Usuarios",
+                    )
+                    st.success(msg_u)
+                    st.rerun()
+                else:
+                    st.warning(msg_u)
+
 
 # ==============================================================================
-# PÁGINA 1: DASHBOARD PRINCIPAL
+# FUNÇÕES DE RENDERIZAÇÃO DE CADA TAB
 # ==============================================================================
-if pagina_selecionada == "› Dashboard Principal":
+def renderizar_tab_home() -> None:
+    """
+    🏠 Tab Home:
+    Apresenta resumo executivo customizado conforme o perfil logado:
+    - Dev / Gerente: Cartões de métricas financeiras e de estoque do dia + gráficos executivos.
+    - Caixa: Atalhos de rotina de fechamento e resumo dos lançamentos do dia.
+    - Equipe: Alertas operacionais de itens com estoque baixo/crítico ou pendentes de contagem.
+    """
+    hoje_str = datetime.now().strftime("%Y-%m-%d")
+    df_estoque = db.obter_estoque_enriquecido()
+    df_criticos = df_estoque[df_estoque["Status"].isin(["CRÍTICO/FALTA", "PENDENTE", "ALERTA"])].copy()
+
     st.markdown(
-        '<div style="margin-bottom: 20px;">'
-        '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Painel Executivo &amp; Controle de Estoque</h1>'
-        '<p style="color:#687787; font-size:0.9rem; margin:0;">Visão consolidada do inventário oficial e inteligência financeira do Restaurante Mazon</p>'
+        f'<div style="margin-bottom: 18px;">'
+        f'<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">Olá, {USUARIO_ATUAL} ({PERFIL_ATUAL})</h1>'
+        f'<p style="color:#687787; font-size:0.9rem; margin:0;">Resumo executivo e operacional do Restaurante Mazon — {datetime.now().strftime("%d/%m/%Y")}</p>'
         "</div>",
         unsafe_allow_html=True,
     )
 
-    df_estoque = db.obter_estoque_enriquecido()
-    df_criticos = df_estoque[df_estoque["Status"].isin(["CRÍTICO/FALTA", "PENDENTE"])].copy()
+    # 1. VISÃO DEV & GERENTE
+    if PERFIL_ATUAL in ["Dev", "Gerente"]:
+        df_fin = db.ler_aba("Financeiro").copy()
+        df_fin["Valor"] = pd.to_numeric(df_fin["Valor"], errors="coerce").fillna(0.0)
 
-    # 1. KPIs em Cards Brancos Minimalistas (Sem bordas grossas coloridas no topo)
-    total_itens = len(df_estoque)
-    total_criticos = len(df_criticos)
-    valor_total_estoque = float(df_estoque["Valor_Total_Item"].sum())
+        df_hoje = df_fin[df_fin["Data"].astype(str) == hoje_str]
+        fat_hoje = float(df_hoje[df_hoje["Tipo"] == "Receita"]["Valor"].sum())
+        desp_hoje = float(df_hoje[df_hoje["Tipo"] == "Despesa"]["Valor"].sum())
+        fat_acumulado = float(df_fin[df_fin["Tipo"] == "Receita"]["Valor"].sum())
+        desp_acumulada = float(df_fin[df_fin["Tipo"] == "Despesa"]["Valor"].sum())
+        saldo_liquido = fat_acumulado - desp_acumulada
 
-    col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
-    with col_kpi1:
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Faturamento de Hoje</div>'
+                f'<div class="mazon-kpi-value">{formatar_moeda(fat_hoje)}</div>'
+                f'<div class="mazon-kpi-sub">Despesas hoje: {formatar_moeda(desp_hoje)}</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with c2:
+            cor_saldo = "#1F9D55" if saldo_liquido >= 0 else "#D9383A"
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Resultado Líquido Acumulado</div>'
+                f'<div class="mazon-kpi-value" style="color:{cor_saldo};">{formatar_moeda(saldo_liquido)}</div>'
+                f'<div class="mazon-kpi-sub">Receitas: {formatar_moeda(fat_acumulado)}</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with c3:
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Insumos em Alerta / Pendentes</div>'
+                f'<div class="mazon-kpi-value" style="color:#D9383A;">{len(df_criticos)}</div>'
+                f'<div class="mazon-kpi-sub">De {len(df_estoque)} insumos oficiais monitorados</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with c4:
+            valor_est = float(df_estoque["Valor_Total_Item"].sum())
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Capital em Estoque</div>'
+                f'<div class="mazon-kpi-value">{formatar_moeda(valor_est)}</div>'
+                '<div class="mazon-kpi-sub">Avaliado pelo custo unitário cadastrado</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+
+        col_g1, col_g2 = st.columns([3, 2])
+        with col_g1:
+            st.markdown(
+                '<div class="mazon-card" style="margin-bottom: 8px; padding: 1.15rem 1.4rem 0.4rem 1.4rem;">'
+                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Evolução Recente: Receitas vs. Despesas (R$)</h4>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            if not df_fin.empty:
+                df_resumo_dia = (
+                    df_fin.groupby(["Data", "Tipo"], as_index=False)["Valor"].sum()
+                )
+                fig_home = px.bar(
+                    df_resumo_dia,
+                    x="Data",
+                    y="Valor",
+                    color="Tipo",
+                    barmode="group",
+                    color_discrete_map={"Receita": "#0B1B2B", "Despesa": "#D4A24C"},
+                )
+                fig_home.update_layout(
+                    paper_bgcolor="#FFFFFF",
+                    plot_bgcolor="#FFFFFF",
+                    font=dict(color="#0B1B2B", family="Poppins"),
+                    xaxis=dict(title="Data", gridcolor="#EBE4D8"),
+                    yaxis=dict(title="Valor (R$)", gridcolor="#EBE4D8"),
+                    margin=dict(l=12, r=12, t=15, b=15),
+                    height=330,
+                )
+                st.plotly_chart(fig_home, use_container_width=True)
+        with col_g2:
+            st.markdown(
+                '<div class="mazon-card" style="margin-bottom: 8px; padding: 1.15rem 1.4rem 0.4rem 1.4rem;">'
+                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Distribuição de Insumos por Categoria</h4>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            df_contagem_cat = (
+                df_estoque.groupby("Categoria", as_index=False)["ID"]
+                .count()
+                .rename(columns={"ID": "Qtd_Itens"})
+            )
+            fig_pie = px.pie(
+                df_contagem_cat,
+                names="Categoria",
+                values="Qtd_Itens",
+                hole=0.6,
+                color_discrete_sequence=[
+                    "#0B1B2B",
+                    "#D4A24C",
+                    "#1C354D",
+                    "#C59237",
+                    "#34506B",
+                    "#E0B86B",
+                    "#526375",
+                    "#8A6D3B",
+                    "#B8ADA0",
+                ],
+            )
+            fig_pie.update_traces(textinfo="percent+label", textfont_color="#0B1B2B")
+            fig_pie.update_layout(
+                paper_bgcolor="#FFFFFF",
+                plot_bgcolor="#FFFFFF",
+                font=dict(color="#0B1B2B", family="Poppins"),
+                showlegend=False,
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=330,
+            )
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+    # 2. VISÃO CAIXA (ATALHOS DE ROTINA OPERACIONAL)
+    elif PERFIL_ATUAL == "Caixa":
+        df_fin_caixa = db.ler_aba("Financeiro")
+        lancamentos_hoje_caixa = df_fin_caixa[
+            (df_fin_caixa["Data"].astype(str) == hoje_str)
+            & (df_fin_caixa["Responsavel"].astype(str) == USUARIO_ATUAL)
+        ]
+
+        c_cx1, c_cx2, c_cx3 = st.columns(3)
+        with c_cx1:
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Seus Lançamentos Hoje</div>'
+                f'<div class="mazon-kpi-value">{len(lancamentos_hoje_caixa)}</div>'
+                '<div class="mazon-kpi-sub">Registros enviados para a planilha central</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with c_cx2:
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Rotina 1 · Fechamento Diário</div>'
+                '<div class="mazon-kpi-value" style="font-size:1.25rem;">💰 Lançamentos / Caixa</div>'
+                '<div class="mazon-kpi-sub">Acesse a aba superior para informar o Faturamento Bruto</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with c_cx3:
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Rotina 2 · Notas &amp; Comprovantes</div>'
+                '<div class="mazon-kpi-value" style="font-size:1.25rem;">📎 Upload Google Drive</div>'
+                '<div class="mazon-kpi-sub">Anexe PDFs e fotos de NFs na aba Lançamentos / Caixa</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
         st.markdown(
-            '<div class="mazon-kpi-card">'
-            '<div class="mazon-kpi-label">Total de Insumos Oficiais</div>'
-            f'<div class="mazon-kpi-value">{total_itens}</div>'
-            f'<div class="mazon-kpi-sub">Distribuídos em {df_estoque["Categoria"].nunique()} categorias operacionais</div>'
+            '<div class="mazon-card" style="margin-top:14px;">'
+            '<h4 style="margin:0 0 8px 0; color:#0B1B2B;">📋 Checklist Operacional do Turno (Perfil Caixa)</h4>'
+            '<ul style="color:#526375; font-size:0.88rem; line-height:1.7; margin-bottom:0;">'
+            "<li><strong>1. Lançamento do Faturamento Bruto Diário:</strong> Acesse a aba <code>💰 Lançamentos / Caixa</code> e registre o fechamento de Salão e Delivery por forma de pagamento.</li>"
+            "<li><strong>2. Digitalização de Notas Fiscais e Comprovantes:</strong> Anexe os comprovantes e notas de fornecedores recebidos no turno; o sistema arquiva automaticamente nas pastas <code>/Notas_Fiscais</code> e <code>/Comprovantes</code> do Google Drive.</li>"
+            "<li><strong>3. Conferência de Insumos:</strong> Utilize a aba <code>📦 Estoque</code> para consultar ou informar entradas de mercadorias recebidas.</li>"
+            "</ul>"
             "</div>",
             unsafe_allow_html=True,
         )
-    with col_kpi2:
-        cor_kpi_crit = "#D9383A" if total_criticos > 0 else "#1F9D55"
-        st.markdown(
-            '<div class="mazon-kpi-card">'
-            '<div class="mazon-kpi-label">Itens Pendentes / Críticos</div>'
-            f'<div class="mazon-kpi-value" style="color: {cor_kpi_crit};">{total_criticos}</div>'
-            f'<div class="mazon-kpi-sub">{(total_criticos / max(total_itens, 1) * 100):.1f}% do portfólio requer reposição ou contagem</div>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-    with col_kpi3:
-        st.markdown(
-            '<div class="mazon-kpi-card">'
-            '<div class="mazon-kpi-label">Valor Total Acumulado em Estoque</div>'
-            f'<div class="mazon-kpi-value">{formatar_moeda(valor_total_estoque)}</div>'
-            '<div class="mazon-kpi-sub">Avaliado pela última cotação de fornecedor</div>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
 
-    st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
-
-    # 2. Gráficos em Cards Minimalistas Brancos
-    base_cat = pd.DataFrame({"Categoria": CATEGORIAS_OFICIAIS})
-    df_cat = base_cat.merge(
-        df_estoque.groupby("Categoria", as_index=False)["Valor_Total_Item"].sum(),
-        on="Categoria",
-        how="left",
-    ).fillna(0.0)
-    df_cat = df_cat.sort_values("Valor_Total_Item", ascending=True)
-
-    col_graf1, col_graf2 = st.columns([3, 2])
-
-    with col_graf1:
-        st.markdown(
-            '<div class="mazon-card" style="margin-bottom: 8px; padding: 1.15rem 1.4rem 0.4rem 1.4rem;">'
-            '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Capital Investido por Categoria (R$)</h4>'
-            '<p style="font-size:0.78rem; color:#687787; margin-top:2px;">Distribuição financeira segundo as cotações registradas</p>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        fig_bar = px.bar(
-            df_cat,
-            x="Valor_Total_Item",
-            y="Categoria",
-            orientation="h",
-            text=df_cat["Valor_Total_Item"].apply(formatar_moeda),
-            color="Valor_Total_Item",
-            color_continuous_scale=["#0B1B2B", "#1E3A56", "#D4A24C"],
-        )
-        fig_bar.update_traces(
-            textposition="outside",
-            marker_line_color="#0B1B2B",
-            marker_line_width=0.4,
-        )
-        fig_bar.update_layout(
-            paper_bgcolor="#FFFFFF",
-            plot_bgcolor="#FFFFFF",
-            font=dict(color="#0B1B2B", family="Poppins"),
-            xaxis=dict(title="Valor Investido (R$)", gridcolor="#EBE4D8"),
-            yaxis=dict(title=""),
-            coloraxis_showscale=False,
-            margin=dict(l=12, r=105, t=15, b=20),
-            height=390,
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    with col_graf2:
-        st.markdown(
-            '<div class="mazon-card" style="margin-bottom: 8px; padding: 1.15rem 1.4rem 0.4rem 1.4rem;">'
-            '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Distribuição de Insumos por Categoria</h4>'
-            '<p style="font-size:0.78rem; color:#687787; margin-top:2px;">Proporção dos 90 itens oficiais no catálogo</p>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        df_contagem_cat = (
-            df_estoque.groupby("Categoria", as_index=False)["ID"]
-            .count()
-            .rename(columns={"ID": "Qtd_Itens"})
-        )
-        fig_pie = px.pie(
-            df_contagem_cat,
-            names="Categoria",
-            values="Qtd_Itens",
-            hole=0.6,
-            color_discrete_sequence=[
-                "#0B1B2B",
-                "#D4A24C",
-                "#1C354D",
-                "#C59237",
-                "#34506B",
-                "#E0B86B",
-                "#526375",
-                "#8A6D3B",
-                "#B8ADA0",
-            ],
-        )
-        fig_pie.update_traces(textinfo="percent+label", textfont_color="#0B1B2B")
-        fig_pie.update_layout(
-            paper_bgcolor="#FFFFFF",
-            plot_bgcolor="#FFFFFF",
-            font=dict(color="#0B1B2B", family="Poppins"),
-            showlegend=False,
-            margin=dict(l=10, r=10, t=15, b=20),
-            height=390,
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    # 3. Card Minimalista de Alertas Críticos / Itens Pendentes
+    # 3. ALERTAS DE ESTOQUE BAIXO / PENDENTE (EXIBIDO PARA EQUIPE E TODOS OS PERFIS)
     if not df_criticos.empty:
         pills_list = []
         for _, row in df_criticos.iterrows():
@@ -589,41 +728,39 @@ if pagina_selecionada == "› Dashboard Principal":
         st.markdown(
             '<div class="critical-hero-card">'
             '<div class="critical-hero-header">'
-            f'<div class="critical-hero-title">Insumos em Falta, Pendentes ou Abaixo do Mínimo ({len(df_criticos)} itens)</div>'
-            '<span class="badge-best-price">Reposição / Contagem</span>'
+            f'<div class="critical-hero-title">⚠️ Alertas de Estoque Baixo ou Pendentes de Contagem ({len(df_criticos)} itens)</div>'
+            '<span class="badge-best-price">Atenção Operacional</span>'
             "</div>"
             '<p style="color:#687787; font-size:0.85rem; margin:0;">'
-            "Os insumos abaixo aguardam contagem inicial ou atingiram nível crítico de ruptura operacional:"
+            "Verifique os insumos abaixo para reposição imediata ou atualização de contagem física:"
             "</p>"
             f'<div class="critical-items-grid">{pills_html}</div>'
             "</div>",
             unsafe_allow_html=True,
         )
-    else:
-        st.markdown(
-            '<div class="mazon-card">'
-            '<h3 style="color:#1F9D55; margin:0; font-size:1.05rem;">Operação Estável — Nenhum Insumo Abaixo do Estoque Mínimo</h3>'
-            '<p style="color:#687787; font-size:0.86rem; margin-top:4px; margin-bottom:0;">Todos os itens monitorados encontram-se acima do ponto de ruptura.</p>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
 
 
-# ==============================================================================
-# PÁGINA 2: GESTÃO E TABELA DE ESTOQUE
-# ==============================================================================
-elif pagina_selecionada == "› Gestão e Tabela de Estoque":
+def renderizar_tab_estoque() -> None:
+    """
+    📦 Tab Estoque:
+    - Mantém a tabela de insumos e movimentações de estoque (entradas/saídas) integrada à planilha.
+    - Permite edição de cadastro (novo item / parâmetros de mínimo, máximo e preço) APENAS para Dev e Gerente.
+    - Inclui o Gerador de Lista de Compras (PDF ReportLab + CSV).
+    """
+    pode_editar_cadastro = PERFIL_ATUAL in ["Dev", "Gerente"]
+
     st.markdown(
-        '<div style="margin-bottom: 18px;">'
-        '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Gestão e Tabela de Estoque</h1>'
-        '<p style="color:#687787; font-size:0.9rem; margin:0;">Controle completo dos 90 insumos oficiais, níveis mínimo/máximo e sincronização direta com a aba <code>Estoque</code> do Google Sheets.</p>'
+        '<div style="margin-bottom: 16px;">'
+        '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">📦 Gestão de Estoque &amp; Movimentações</h1>'
+        '<p style="color:#687787; font-size:0.9rem; margin:0;">Controle dos 90 insumos oficiais sincronizados com a aba <code>Estoque</code> da planilha unificada.</p>'
         "</div>",
         unsafe_allow_html=True,
     )
 
     df_estoque = db.obter_estoque_enriquecido()
 
-    col_f1, col_f2, col_f3, col_btn = st.columns([2, 2, 2, 1.5])
+    # Barra de filtros e botões de ação conforme permissão RBAC
+    col_f1, col_f2, col_f3, col_btn = st.columns([2, 2, 1.8, 1.6])
     with col_f1:
         busca_texto = st.text_input("Buscar por Item ou ID", placeholder="Ex: Salmão, H01, MZ-001...")
     with col_f2:
@@ -642,14 +779,22 @@ elif pagina_selecionada == "› Gestão e Tabela de Estoque":
         )
     with col_btn:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        abrir_modal = st.button("＋ Novo / Editar Item", use_container_width=True)
+        if pode_editar_cadastro:
+            abrir_modal_cadastro = st.button("＋ Cadastrar / Editar Item", use_container_width=True)
+        else:
+            abrir_modal_cadastro = False
+            st.markdown(
+                '<div style="font-size:0.76rem; color:#687787; padding-top:8px;">🔒 Edição de cadastro restrita a Dev/Gerente</div>',
+                unsafe_allow_html=True,
+            )
 
-    @st.dialog("Cadastrar ou Atualizar Insumo no Estoque")
+    # Modal de Cadastro / Edição de Parâmetros (Exclusivo para Dev e Gerente)
+    @st.dialog("Cadastrar ou Editar Cadastro de Insumo")
     def modal_cadastro_estoque() -> None:
         st.markdown(
-            "Preencha os dados abaixo. Se o **ID** ou **Nome do Item** já existir, o registro será atualizado."
+            "Preencha os parâmetros do insumo. Se o **ID** ou **Nome do Item** já existir, o cadastro será atualizado."
         )
-        with st.form("form_modal_estoque", clear_on_submit=False):
+        with st.form("form_modal_estoque_rbac", clear_on_submit=False):
             c1, c2 = st.columns(2)
             with c1:
                 in_id = st.text_input("ID do Insumo (opcional para novo)", placeholder="Ex: MZ-001")
@@ -663,13 +808,10 @@ elif pagina_selecionada == "› Gestão e Tabela de Estoque":
                 in_qtd = st.number_input("Quantidade Atual *", min_value=0.0, value=0.0, step=0.5)
                 in_min = st.number_input("Estoque Mínimo *", min_value=0.0, value=0.0, step=0.5)
                 in_max = st.number_input("Estoque Máximo *", min_value=0.0, value=0.0, step=1.0)
-                in_preco = st.number_input(
-                    "Preço Unitário de Referência (R$)", min_value=0.0, value=0.0, step=1.0
-                )
-            in_forn = st.text_input("Fornecedor de Referência", value="Fornecedor Padrão")
+                in_preco = st.number_input("Preço Unitário (R$)", min_value=0.0, value=0.0, step=1.0)
+            in_forn = st.text_input("Fornecedor Principal", value="-")
 
-            submetido = st.form_submit_button("Salvar e Sincronizar com Google Sheets")
-            if submetido:
+            if st.form_submit_button("Salvar Cadastro na Planilha Unificada", use_container_width=True):
                 if not in_nome.strip():
                     st.error("Informe o nome do insumo.")
                 else:
@@ -681,16 +823,67 @@ elif pagina_selecionada == "› Gestão e Tabela de Estoque":
                         qtd_atual=in_qtd,
                         est_minimo=in_min,
                         est_maximo=in_max,
-                        preco_referencia=in_preco if in_preco > 0 else None,
+                        preco_referencia=in_preco,
                         fornecedor_referencia=in_forn,
                     )
                     if ok:
+                        registrar_log(
+                            usuario=USUARIO_ATUAL,
+                            perfil=PERFIL_ATUAL,
+                            acao=f"Edição de cadastro no estoque: '{in_nome}' (Qtd={in_qtd}, Min={in_min}, Max={in_max}, R$={in_preco})",
+                            modulo="Estoque",
+                        )
                         st.success(msg)
                         st.rerun()
 
-    if abrir_modal:
+    if abrir_modal_cadastro and pode_editar_cadastro:
         modal_cadastro_estoque()
 
+    # Formulário de Movimentação de Estoque (Entrada / Saída Operacional)
+    with st.expander("🔄 Registrar Entrada ou Saída de Mercadoria (Movimentação de Estoque)", expanded=False):
+        with st.form("form_movimentacao_estoque"):
+            cm1, cm2, cm3, cm4 = st.columns([2.2, 1.4, 1.4, 2])
+            with cm1:
+                mov_item = st.selectbox("Insumo", options=df_estoque["Item"].tolist())
+            with cm2:
+                mov_tipo = st.selectbox("Tipo de Movimento", options=["Entrada (+)", "Saída / Baixa (-)"])
+            with cm3:
+                mov_qtd = st.number_input("Quantidade Movimentada", min_value=0.01, value=1.0, step=0.5)
+            with cm4:
+                mov_obs = st.text_input("Motivo / NF / Observação", placeholder="Ex: Recebimento NF 402 ou Consumo Cozinha")
+
+            if st.form_submit_button("Confirmar Movimentação de Estoque"):
+                linha_item = df_estoque[df_estoque["Item"] == mov_item].iloc[0]
+                qtd_antiga = float(linha_item["Qtd_Atual"])
+                if mov_tipo.startswith("Entrada"):
+                    nova_qtd = qtd_antiga + float(mov_qtd)
+                else:
+                    nova_qtd = max(0.0, qtd_antiga - float(mov_qtd))
+
+                ok_mov, _ = db.cadastrar_ou_atualizar_item_estoque(
+                    item_id=str(linha_item["ID"]),
+                    nome_item=str(linha_item["Item"]),
+                    categoria=str(linha_item["Categoria"]),
+                    unidade=str(linha_item["Unidade"]),
+                    qtd_atual=nova_qtd,
+                    est_minimo=float(linha_item["Est_Minimo"]),
+                    est_maximo=float(linha_item["Est_Maximo"]),
+                    preco_referencia=float(linha_item.get("Preco_Unitario", 0.0)),
+                    fornecedor_referencia=str(linha_item.get("Fornecedor", "-")),
+                )
+                if ok_mov:
+                    registrar_log(
+                        usuario=USUARIO_ATUAL,
+                        perfil=PERFIL_ATUAL,
+                        acao=f"{mov_tipo} de {mov_qtd} {linha_item['Unidade']} em '{mov_item}' (Saldo: {qtd_antiga} -> {nova_qtd}) | Obs: {mov_obs or '-'}",
+                        modulo="Estoque",
+                    )
+                    st.success(
+                        f"Movimentação registrada! Novo saldo de '{mov_item}': {nova_qtd:.2f} {linha_item['Unidade']}."
+                    )
+                    st.rerun()
+
+    # Aplicação dos filtros na tabela de estoque
     df_filtrado = df_estoque.copy()
     if busca_texto.strip():
         termo = busca_texto.strip().lower()
@@ -715,13 +908,14 @@ elif pagina_selecionada == "› Gestão e Tabela de Estoque":
             f'<td style="font-weight:600;">{float(row["Qtd_Atual"]):.2f}</td>'
             f'<td>{float(row["Est_Minimo"]):.2f}</td>'
             f'<td>{float(row["Est_Maximo"]):.2f}</td>'
+            f'<td>{formatar_moeda(float(row.get("Preco_Unitario", 0.0)))}</td>'
             f"<td>{badge_html}</td>"
             f'<td style="color:#687787;">{row["Data_Ultima_Reposicao"]}</td>'
             "</tr>"
         )
 
     corpo_tabela_html = "".join(linhas_lista) if linhas_lista else (
-        '<tr><td colspan="9" style="text-align:center; color:#687787; padding:18px;">Nenhum insumo encontrado para os filtros selecionados.</td></tr>'
+        '<tr><td colspan="10" style="text-align:center; color:#687787; padding:18px;">Nenhum insumo encontrado para os filtros selecionados.</td></tr>'
     )
 
     tabela_estoque_html = (
@@ -736,6 +930,7 @@ elif pagina_selecionada == "› Gestão e Tabela de Estoque":
         "<th>Qtd Atual</th>"
         "<th>Mínimo</th>"
         "<th>Máximo</th>"
+        "<th>Custo Unit.</th>"
         "<th>Status</th>"
         "<th>Última Reposição</th>"
         "</tr>"
@@ -746,479 +941,24 @@ elif pagina_selecionada == "› Gestão e Tabela de Estoque":
     )
     st.markdown(tabela_estoque_html, unsafe_allow_html=True)
 
-    with st.expander("Editar ou Cadastrar Insumo Diretamente na Página", expanded=False):
-        with st.form("form_inline_estoque"):
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                f_id = st.text_input("ID (Ex: MZ-001)", value="")
-                f_item = st.text_input("Item *", value="")
-            with col2:
-                f_cat = st.selectbox("Categoria", options=CATEGORIAS_OFICIAIS)
-                f_un = st.text_input("Unidade", value="kg")
-            with col3:
-                f_qtd = st.number_input("Qtd Atual", min_value=0.0, value=0.0, step=0.5)
-                f_min = st.number_input("Est. Mínimo", min_value=0.0, value=0.0, step=0.5)
-            with col4:
-                f_max = st.number_input("Est. Máximo", min_value=0.0, value=0.0, step=1.0)
-                f_preco = st.number_input("Preço Unitário (R$)", min_value=0.0, value=0.0, step=1.0)
-
-            if st.form_submit_button("Salvar Alterações no Google Sheets"):
-                if f_item.strip():
-                    ok, msg = db.cadastrar_ou_atualizar_item_estoque(
-                        item_id=f_id,
-                        nome_item=f_item,
-                        categoria=f_cat,
-                        unidade=f_un,
-                        qtd_atual=f_qtd,
-                        est_minimo=f_min,
-                        est_maximo=f_max,
-                        preco_referencia=f_preco if f_preco > 0 else None,
-                    )
-                    if ok:
-                        st.success(msg)
-                        st.rerun()
-                else:
-                    st.warning("Informe o nome do Item para salvar.")
-
-
-# ==============================================================================
-# PÁGINA 3: COMPARATIVO DE PREÇOS
-# ==============================================================================
-elif pagina_selecionada == "› Comparativo de Preços":
-    st.markdown(
-        '<div style="margin-bottom: 18px;">'
-        '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Inteligência de Preços e Fornecedores</h1>'
-        '<p style="color:#687787; font-size:0.9rem; margin:0;">Análise histórica de cotações, evolução de custo por insumo e recomendação automática do Melhor Preço Atual.</p>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    df_estoque_lista = db.ler_aba("Estoque")
-    todos_insumos_oficiais = sorted(df_estoque_lista["Item"].unique().tolist())
-
-    df_precos = db.ler_aba("Fornecedores_Precos").copy()
-    if not df_precos.empty:
-        df_precos["Preco_Unitario"] = pd.to_numeric(
-            df_precos["Preco_Unitario"], errors="coerce"
-        ).fillna(0.0)
-
-    with st.expander("Registrar Nova Cotação de Fornecedor", expanded=df_precos.empty):
-        with st.form("form_nova_cotacao"):
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                cot_insumo = st.selectbox("Insumo", options=todos_insumos_oficiais)
-            with c2:
-                cot_forn = st.text_input("Fornecedor *", placeholder="Ex: Mar & Cia Imports")
-            with c3:
-                cot_preco = st.number_input("Preço Unitário (R$) *", min_value=0.01, value=10.0, step=0.5)
-            with c4:
-                cot_unid = st.text_input("Unidade", value="kg")
-
-            if st.form_submit_button("Registrar Cotação"):
-                if cot_forn.strip():
-                    db.registrar_preco_fornecedor(
-                        insumo=cot_insumo,
-                        fornecedor=cot_forn,
-                        preco_unitario=cot_preco,
-                        unidade=cot_unid,
-                    )
-                    st.success("Cotação registrada com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("Informe o nome do fornecedor.")
-
-    if df_precos.empty:
-        st.markdown(
-            '<div class="mazon-card">'
-            '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Nenhuma cotação registrada ainda</h4>'
-            '<p style="color:#687787; font-size:0.86rem; margin-top:6px; margin-bottom:0;">Utilize o formulário acima para registrar os preços reais de compra e habilitar o comparativo automático entre fornecedores.</p>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        insumos_cotados = sorted(df_precos["Insumo"].unique().tolist())
-        insumo_padrao_idx = (
-            insumos_cotados.index("Salmão") if "Salmão" in insumos_cotados else 0
-        )
-
-        col_sel, _ = st.columns([2, 1])
-        with col_sel:
-            insumo_selecionado = st.selectbox(
-                "Selecione o Insumo para Análise de Evolução e Comparativo:",
-                options=insumos_cotados,
-                index=insumo_padrao_idx,
-            )
-
-        df_insumo = df_precos[df_precos["Insumo"] == insumo_selecionado].sort_values("Data_Registro")
-
-        ultimas_por_fornecedor = (
-            df_insumo.sort_values("Data_Registro", ascending=False)
-            .groupby("Fornecedor", as_index=False)
-            .first()
-            .sort_values("Preco_Unitario", ascending=True)
-        )
-
-        if not ultimas_por_fornecedor.empty:
-            melhor_linha = ultimas_por_fornecedor.iloc[0]
-            pior_preco = float(ultimas_por_fornecedor["Preco_Unitario"].max())
-            melhor_preco = float(melhor_linha["Preco_Unitario"])
-            economia_unit = max(0.0, pior_preco - melhor_preco)
-
-            st.markdown(
-                '<div class="mazon-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">'
-                "<div>"
-                '<span class="badge-best-price">MELHOR PREÇO ATUAL</span>'
-                f'<h3 style="margin:8px 0 4px 0; color:#0B1B2B; font-size:1.2rem;">{melhor_linha["Fornecedor"]} — <span style="color:#9A6B1F;">{formatar_moeda(melhor_preco)} / {melhor_linha["Unidade"]}</span></h3>'
-                f'<div style="font-size:0.83rem; color:#687787;">Insumo: <strong>{insumo_selecionado}</strong> · Última cotação em {melhor_linha["Data_Registro"]}</div>'
-                "</div>"
-                '<div style="text-align:right;">'
-                '<div style="font-size:0.75rem; color:#687787; text-transform:uppercase;">Economia vs. Maior Cotação</div>'
-                f'<div style="font-size:1.35rem; font-weight:600; color:#1F9D55;">{formatar_moeda(economia_unit)} / {melhor_linha["Unidade"]}</div>'
-                "</div>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
-
-        st.markdown(f"#### Evolução Histórica de Preço — {insumo_selecionado}")
-        fig_evolucao = px.line(
-            df_insumo,
-            x="Data_Registro",
-            y="Preco_Unitario",
-            color="Fornecedor",
-            markers=True,
-            color_discrete_sequence=["#0B1B2B", "#D4A24C", "#1F9D55", "#D9383A", "#687787"],
-            labels={
-                "Data_Registro": "Data da Cotação / Compra",
-                "Preco_Unitario": "Preço Unitário (R$)",
-                "Fornecedor": "Fornecedor",
-            },
-        )
-        fig_evolucao.update_traces(line=dict(width=2.5), marker=dict(size=8))
-        fig_evolucao.update_layout(
-            paper_bgcolor="#FFFFFF",
-            plot_bgcolor="#FFFFFF",
-            font=dict(color="#0B1B2B", family="Poppins"),
-            xaxis=dict(gridcolor="#EBE4D8"),
-            yaxis=dict(gridcolor="#EBE4D8", tickprefix="R$ "),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=20, r=20, t=40, b=20),
-            height=380,
-        )
-        st.plotly_chart(fig_evolucao, use_container_width=True)
-
-        st.markdown("#### Tabela Comparativa de Fornecedores")
-        ultimas_geral = (
-            df_precos.sort_values("Data_Registro", ascending=False)
-            .groupby(["Insumo", "Fornecedor"], as_index=False)
-            .first()
-        )
-        min_por_insumo = ultimas_geral.groupby("Insumo")["Preco_Unitario"].transform("min")
-        ultimas_geral["Eh_Melhor"] = ultimas_geral["Preco_Unitario"] == min_por_insumo
-        ultimas_geral = ultimas_geral.sort_values(["Insumo", "Preco_Unitario"])
-
-        linhas_comp_list = []
-        for _, row in ultimas_geral.iterrows():
-            destaque_tag = (
-                '<span class="badge-best-price">MELHOR PREÇO ATUAL</span>'
-                if row["Eh_Melhor"]
-                else '<span style="color:#687787; font-size:0.78rem;">Cotação Secundária</span>'
-            )
-            cor_preco = "#1F9D55" if row["Eh_Melhor"] else "#0B1B2B"
-            linhas_comp_list.append(
-                "<tr>"
-                f'<td style="color:#9A6B1F; font-weight:600;">{row["ID"]}</td>'
-                f'<td style="font-weight:500; color:#0B1B2B;">{row["Insumo"]}</td>'
-                f'<td>{row["Fornecedor"]}</td>'
-                f'<td style="font-weight:600; color:{cor_preco};">{formatar_moeda(float(row["Preco_Unitario"]))}</td>'
-                f'<td>{row["Unidade"]}</td>'
-                f'<td>{row["Data_Registro"]}</td>'
-                f"<td>{destaque_tag}</td>"
-                "</tr>"
-            )
-
-        tabela_comp_html = (
-            '<div class="mazon-table-wrapper">'
-            '<table class="mazon-table">'
-            "<thead>"
-            "<tr>"
-            "<th>ID</th>"
-            "<th>Insumo</th>"
-            "<th>Fornecedor</th>"
-            "<th>Preço Unitário</th>"
-            "<th>Unidade</th>"
-            "<th>Data Registro</th>"
-            "<th>Recomendação de Compra</th>"
-            "</tr>"
-            "</thead>"
-            f"<tbody>{''.join(linhas_comp_list)}</tbody>"
-            "</table>"
-            "</div>"
-        )
-        st.markdown(tabela_comp_html, unsafe_allow_html=True)
-
-
-# ==============================================================================
-# PÁGINA 4: CENTRAL OCR / IA
-# ==============================================================================
-elif pagina_selecionada == "› Central OCR / IA":
-    st.markdown(
-        '<div style="margin-bottom: 18px;">'
-        '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Central de Ingestão Documental (OCR / IA)</h1>'
-        '<p style="color:#687787; font-size:0.9rem; margin:0;">Envie fotos ou PDFs de Notas Fiscais de Compra e Extratos de Vendas do Dia. Os arquivos são arquivados no Google Drive e pré-processados para a Fase 2.</p>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    col_up, col_info = st.columns([3, 2])
-
-    with col_up:
-        st.markdown("#### Upload de Documentos")
-        tipo_doc = st.radio(
-            "Selecione a Natureza do Documento:",
-            options=["Nota Fiscal / Cupom de Compra", "Extrato de Vendas do Dia (PDV)"],
-            horizontal=True,
-        )
-
-        arquivos_enviados = st.file_uploader(
-            "Arraste e solte imagens (.png, .jpg, .jpeg) ou documentos (.pdf)",
-            type=["png", "jpg", "jpeg", "pdf"],
-            accept_multiple_files=True,
-        )
-
-        fornecedor_manual = ""
-        valor_manual = 0.0
-        if tipo_doc == "Nota Fiscal / Cupom de Compra":
-            c_nf1, c_nf2 = st.columns(2)
-            with c_nf1:
-                fornecedor_manual = st.text_input(
-                    "Fornecedor (opcional p/ indexação imediata)", placeholder="Ex: Mar & Cia Imports"
-                )
-            with c_nf2:
-                valor_manual = st.number_input("Valor Total da Nota (R$)", min_value=0.0, value=0.0, step=10.0)
-
-        if arquivos_enviados:
-            if st.button("Arquivar no Google Drive & Executar Pré-Análise IA", use_container_width=True):
-                for arq in arquivos_enviados:
-                    bytes_arq = arq.read()
-                    link_drive = db.upload_arquivo_drive(
-                        arquivo_bytes=bytes_arq,
-                        nome_arquivo=arq.name,
-                        mime_type=arq.type or "application/octet-stream",
-                    )
-                    resultado_ocr = processar_documento_ocr_ia(
-                        arquivo_bytes=bytes_arq,
-                        nome_arquivo=arq.name,
-                        tipo_documento=tipo_doc,
-                    )
-
-                    if tipo_doc == "Nota Fiscal / Cupom de Compra":
-                        df_entradas = db.ler_aba("Entradas_Compras")
-                        nova_entrada = pd.DataFrame(
-                            [
-                                {
-                                    "ID_Nota": f"NF-{datetime.now().strftime('%Y%m%d-%H%M')}",
-                                    "Data": datetime.now().strftime("%Y-%m-%d"),
-                                    "Fornecedor": fornecedor_manual.strip() or "Pendente OCR Fase 2",
-                                    "Valor_Total": valor_manual,
-                                    "Link_Drive": link_drive,
-                                }
-                            ]
-                        )
-                        df_entradas = pd.concat([df_entradas, nova_entrada], ignore_index=True)
-                        db.salvar_aba("Entradas_Compras", df_entradas)
-
-                    st.success(f"Arquivo '{arq.name}' salvo! Link Drive: {link_drive}")
-                    st.json(resultado_ocr)
-
-    with col_info:
-        st.markdown(
-            '<div class="mazon-card">'
-            '<h4 style="color:#0B1B2B; margin-top:0; font-size:0.98rem;">Arquitetura de Visão Computacional (Fase 2)</h4>'
-            '<p style="font-size:0.85rem; color:#0B1B2B;">'
-            "O módulo <code>processar_documento_ocr_ia()</code> em <code>sheets_manager.py</code> possui os contratos de dados prontos para:"
-            "</p>"
-            '<ul style="font-size:0.83rem; color:#687787; line-height:1.6;">'
-            "<li><strong>Notas de Compra:</strong> Extração de CNPJ/Fornecedor, Itens, Quantidades e Preços Unitários, alimentando simultaneamente <code>Entradas_Compras</code>, <code>Estoque</code> e <code>Fornecedores_Precos</code>.</li>"
-            "<li><strong>Extratos de Vendas:</strong> Leitura de pratos vendidos no dia e baixa automática de insumos cruzando com a aba <code>Ficha_Tecnica</code>.</li>"
-            "</ul>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-    tab_ent, tab_sai, tab_ft = st.tabs(
-        ["Histórico Entradas_Compras", "Histórico Saidas_Vendas", "Ficha_Tecnica Cadastrada"]
-    )
-    with tab_ent:
-        st.dataframe(db.ler_aba("Entradas_Compras"), use_container_width=True, hide_index=True)
-    with tab_sai:
-        st.dataframe(db.ler_aba("Saidas_Vendas"), use_container_width=True, hide_index=True)
-    with tab_ft:
-        st.dataframe(db.ler_aba("Ficha_Tecnica"), use_container_width=True, hide_index=True)
-
-
-# ==============================================================================
-# PÁGINA 5: GERADOR DE LISTA DE COMPRAS
-# ==============================================================================
-elif pagina_selecionada == "› Gerador de Lista de Compras":
-    st.markdown(
-        '<div style="margin-bottom: 18px;">'
-        '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.75rem;">Gerador Inteligente de Lista de Compras</h1>'
-        '<p style="color:#687787; font-size:0.9rem; margin:0;">Cálculo automatizado de reposição pela fórmula <code>Qtd_Necessaria = Est_Maximo - Qtd_Atual</code> para todos os itens em estado Crítico, Pendente ou Alerta, com exportação direta em PDF e Planilha.</p>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    df_estoque = db.obter_estoque_enriquecido()
-    df_precos = db.ler_aba("Fornecedores_Precos")
-    if not df_precos.empty:
-        df_precos["Preco_Unitario"] = pd.to_numeric(
-            df_precos["Preco_Unitario"], errors="coerce"
-        ).fillna(0.0)
-
-    incluir_todos_abaixo_max = st.checkbox(
-        "Incluir também itens 'OK/CHEIO' que estejam abaixo do Estoque Máximo", value=False
-    )
-
-    if incluir_todos_abaixo_max:
-        df_alerta = df_estoque[df_estoque["Qtd_Atual"] < df_estoque["Est_Maximo"]].copy()
-    else:
+    # Exportação da Lista de Compras (PDF / CSV) integrada à aba Estoque
+    with st.expander("🛒 Gerador de Lista de Compras & Exportação em PDF / CSV", expanded=False):
         df_alerta = df_estoque[
             df_estoque["Status"].isin(["CRÍTICO/FALTA", "ALERTA", "PENDENTE"])
         ].copy()
-
-    df_alerta["Qtd_Necessaria"] = (df_alerta["Est_Maximo"] - df_alerta["Qtd_Atual"]).clip(lower=0.0)
-
-    if not df_precos.empty:
-        melhores_forn = (
-            df_precos.sort_values("Data_Registro", ascending=False)
-            .groupby(["Insumo", "Fornecedor"], as_index=False)
-            .first()
-            .sort_values("Preco_Unitario", ascending=True)
-            .groupby("Insumo", as_index=False)
-            .first()
-            .rename(
-                columns={
-                    "Insumo": "Item",
-                    "Fornecedor": "Melhor_Fornecedor",
-                    "Preco_Unitario": "Melhor_Preco_Unitario",
-                }
-            )
+        df_alerta["Qtd_Necessaria"] = (
+            df_alerta["Est_Maximo"] - df_alerta["Qtd_Atual"]
+        ).clip(lower=0.0)
+        df_alerta["Custo_Estimado_Reposicao"] = (
+            df_alerta["Qtd_Necessaria"] * df_alerta["Preco_Unitario"]
         )
-        df_compras = df_alerta.merge(
-            melhores_forn[["Item", "Melhor_Fornecedor", "Melhor_Preco_Unitario"]],
-            on="Item",
-            how="left",
-        )
-    else:
-        df_compras = df_alerta.copy()
-        df_compras["Melhor_Fornecedor"] = "A Cotar"
-        df_compras["Melhor_Preco_Unitario"] = 0.0
+        custo_total_compra = float(df_alerta["Custo_Estimado_Reposicao"].sum())
 
-    df_compras["Melhor_Fornecedor"] = df_compras["Melhor_Fornecedor"].fillna("A Cotar")
-    df_compras["Melhor_Preco_Unitario"] = df_compras["Melhor_Preco_Unitario"].fillna(
-        df_compras["Ultimo_Preco_Unitario"]
-    )
-    df_compras["Custo_Estimado_Reposicao"] = (
-        df_compras["Qtd_Necessaria"] * df_compras["Melhor_Preco_Unitario"]
-    )
+        pdf_bytes = gerar_pdf_lista_compras(df_alerta, custo_total_compra)
+        csv_bytes = df_alerta.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
 
-    custo_total_compra = float(df_compras["Custo_Estimado_Reposicao"].sum())
-
-    c_res1, c_res2, c_res3 = st.columns(3)
-    with c_res1:
-        st.markdown(
-            '<div class="mazon-kpi-card">'
-            '<div class="mazon-kpi-label">Itens na Lista de Compra</div>'
-            f'<div class="mazon-kpi-value">{len(df_compras)}</div>'
-            '<div class="mazon-kpi-sub">Insumos requerendo reposição ou parametrização</div>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-    with c_res2:
-        st.markdown(
-            '<div class="mazon-kpi-card">'
-            '<div class="mazon-kpi-label">Orçamento Estimado de Compra</div>'
-            f'<div class="mazon-kpi-value">{formatar_moeda(custo_total_compra)}</div>'
-            '<div class="mazon-kpi-sub">Calculado pelo Melhor Preço Atual de cada item</div>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-    with c_res3:
-        st.markdown(
-            '<div class="mazon-kpi-card">'
-            '<div class="mazon-kpi-label">Fornecedores Envolvidos</div>'
-            f'<div class="mazon-kpi-value">{df_compras["Melhor_Fornecedor"].nunique()}</div>'
-            '<div class="mazon-kpi-sub">Agrupados por melhor cotação ativa</div>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
-
-    if df_compras.empty:
-        st.info("Nenhum item precisa de reposição no momento.")
-    else:
-        linhas_compra_list = []
-        for _, row in df_compras.iterrows():
-            linhas_compra_list.append(
-                "<tr>"
-                f'<td style="color:#9A6B1F; font-weight:600;">{row["ID"]}</td>'
-                f'<td style="font-weight:500; color:#0B1B2B;">{row["Item"]}</td>'
-                f'<td>{row["Categoria"]}</td>'
-                f'<td>{renderizar_badge_status(str(row["Status"]))}</td>'
-                f'<td>{float(row["Qtd_Atual"]):.2f} {row["Unidade"]}</td>'
-                f'<td>{float(row["Est_Minimo"]):.2f} {row["Unidade"]}</td>'
-                f'<td>{float(row["Est_Maximo"]):.2f} {row["Unidade"]}</td>'
-                f'<td style="font-weight:600; color:#9A6B1F;">+{float(row["Qtd_Necessaria"]):.2f} {row["Unidade"]}</td>'
-                f'<td>{row["Melhor_Fornecedor"]}</td>'
-                f'<td style="font-weight:600; color:#1F9D55;">{formatar_moeda(float(row["Custo_Estimado_Reposicao"]))}</td>'
-                "</tr>"
-            )
-
-        tabela_compras_html = (
-            '<div class="mazon-table-wrapper">'
-            '<table class="mazon-table">'
-            "<thead>"
-            "<tr>"
-            "<th>ID</th>"
-            "<th>Insumo</th>"
-            "<th>Categoria</th>"
-            "<th>Status</th>"
-            "<th>Qtd Atual</th>"
-            "<th>Estoque Mínimo</th>"
-            "<th>Estoque Máximo</th>"
-            "<th>Qtd a Comprar</th>"
-            "<th>Fornecedor</th>"
-            "<th>Subtotal Est.</th>"
-            "</tr>"
-            "</thead>"
-            f"<tbody>{''.join(linhas_compra_list)}</tbody>"
-            "</table>"
-            "</div>"
-        )
-        st.markdown(tabela_compras_html, unsafe_allow_html=True)
-
-        pdf_bytes = gerar_pdf_lista_compras(df_compras, custo_total_compra)
-
-        colunas_export = [
-            "ID",
-            "Item",
-            "Categoria",
-            "Unidade",
-            "Status",
-            "Qtd_Atual",
-            "Est_Minimo",
-            "Est_Maximo",
-            "Qtd_Necessaria",
-            "Melhor_Fornecedor",
-            "Melhor_Preco_Unitario",
-            "Custo_Estimado_Reposicao",
-        ]
-        df_export = df_compras[colunas_export].copy()
-        csv_bytes = df_export.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
-
-        col_dl1, col_dl2 = st.columns(2)
-        with col_dl1:
+        cdl1, cdl2 = st.columns(2)
+        with cdl1:
             st.download_button(
                 label="📄 Exportar Lista de Compras (PDF)",
                 data=pdf_bytes,
@@ -1226,7 +966,7 @@ elif pagina_selecionada == "› Gerador de Lista de Compras":
                 mime="application/pdf",
                 use_container_width=True,
             )
-        with col_dl2:
+        with cdl2:
             st.download_button(
                 label="📥 Exportar Lista de Compras (Planilha CSV / Excel)",
                 data=csv_bytes,
@@ -1234,3 +974,710 @@ elif pagina_selecionada == "› Gerador de Lista de Compras":
                 mime="text/csv",
                 use_container_width=True,
             )
+
+
+def renderizar_tab_financeiro() -> None:
+    """
+    💰 Tab Gestão Financeira (Dev e Gerente) ou 💰 Lançamentos / Caixa (Caixa):
+    - Visão Restrita (Perfil Caixa): Exibe APENAS o formulário de lançamento do faturamento bruto diário
+      e upload de arquivos (NFs/Comprovantes) para a pasta do Google Drive. Omite gráficos, DRE e margens.
+    - Visão Completa (Dev e Gerente): Painel de filtros interativos no topo (Período, Fornecedor, Faixa de Valor,
+      Categoria/Forma de Pagamento), cartões de métricas consolidadas, gráficos Plotly (Fluxo de Caixa, DRE,
+      Faturamento por Período, Despesas por Categoria) e tabela detalhada.
+    - TRAVA RIGOROSA DE EXCLUSÃO: Botões para excluir lançamentos ou remover NFs são renderizados e executados
+      EXCLUSIVAMENTE quando st.session_state['usuario'] == 'Arthur' (Perfil Dev).
+    """
+    # ==========================================================================
+    # VISÃO RESTRITA: PERFIL CAIXA
+    # ==========================================================================
+    if PERFIL_ATUAL == "Caixa":
+        st.markdown(
+            '<div style="margin-bottom: 18px;">'
+            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">💰 Lançamentos de Caixa &amp; Envio de Comprovantes</h1>'
+            '<p style="color:#687787; font-size:0.9rem; margin:0;">Registre o faturamento bruto diário e envie Notas Fiscais ou Comprovantes diretamente para a pasta oficial do Google Drive.</p>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        col_f_caixa, col_up_caixa = st.columns([1.2, 1.0])
+
+        with col_f_caixa:
+            st.markdown('<div class="mazon-card">', unsafe_allow_html=True)
+            st.markdown("#### 💵 Lançamento de Faturamento Bruto Diário")
+            with st.form("form_caixa_faturamento", clear_on_submit=True):
+                cx_data = st.date_input("Data do Faturamento", value=date.today())
+                cx_cat = st.selectbox(
+                    "Origem do Faturamento",
+                    options=[
+                        "Faturamento Salão",
+                        "Faturamento Delivery (iFood / Próprio)",
+                        "Eventos & Reservas",
+                    ],
+                )
+                cx_forma = st.selectbox("Forma de Pagamento Principal", options=FORMAS_PAGAMENTO)
+                cx_valor = st.number_input(
+                    "Valor Bruto Apurado (R$) *", min_value=0.01, value=100.0, step=50.0
+                )
+                cx_desc = st.text_input(
+                    "Observação / Turno", placeholder="Ex: Fechamento Turno Almoço / Jantar"
+                )
+                cx_arq = st.file_uploader(
+                    "Anexar Comprovante de Fechamento (opcional - PDF/JPG/PNG)",
+                    type=["pdf", "png", "jpg", "jpeg"],
+                    key="up_caixa_fechamento",
+                )
+
+                if st.form_submit_button("Registrar Faturamento no Sistema", use_container_width=True):
+                    link_comp = "-"
+                    if cx_arq is not None:
+                        link_comp = db.upload_arquivo_drive(
+                            arquivo_bytes=cx_arq.read(),
+                            nome_arquivo=cx_arq.name,
+                            mime_type=cx_arq.type or "application/octet-stream",
+                            subpasta="Comprovantes",
+                        )
+                        registrar_log(
+                            usuario=USUARIO_ATUAL,
+                            perfil=PERFIL_ATUAL,
+                            acao=f"Upload de comprovante '{cx_arq.name}' para /Comprovantes no Google Drive",
+                            modulo="Caixa",
+                        )
+
+                    ok_fin, novo_id = db.registrar_lancamento_financeiro(
+                        data_lancamento=cx_data.strftime("%Y-%m-%d"),
+                        tipo="Receita",
+                        natureza_custo="Faturamento Bruto",
+                        descricao=cx_desc or f"Fechamento {cx_cat}",
+                        categoria=cx_cat,
+                        fornecedor="Cliente Final",
+                        forma_pagamento=cx_forma,
+                        valor=cx_valor,
+                        link_comprovante=link_comp,
+                        responsavel=USUARIO_ATUAL,
+                    )
+                    if ok_fin:
+                        registrar_log(
+                            usuario=USUARIO_ATUAL,
+                            perfil=PERFIL_ATUAL,
+                            acao=f"Lançamento de Faturamento Bruto ({novo_id}): {formatar_moeda(cx_valor)} via {cx_forma}",
+                            modulo="Caixa",
+                        )
+                        st.success(f"Faturamento {novo_id} registrado com sucesso!")
+                        st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with col_up_caixa:
+            st.markdown('<div class="mazon-card">', unsafe_allow_html=True)
+            st.markdown("#### 📎 Upload de Notas Fiscais e Comprovantes (Google Drive)")
+            with st.form("form_caixa_upload_nf", clear_on_submit=True):
+                nf_data = st.date_input("Data do Documento", value=date.today(), key="dt_nf_cx")
+                nf_subpasta = st.selectbox(
+                    "Pasta de Destino no Google Drive",
+                    options=["Notas_Fiscais", "Comprovantes"],
+                )
+                nf_forn = st.text_input("Fornecedor / Emissor *", placeholder="Ex: Mar & Cia Imports")
+                nf_cat = st.selectbox(
+                    "Categoria da Despesa / Nota",
+                    options=[c for c in CATEGORIAS_FINANCEIRAS if not c.startswith("Faturamento")],
+                )
+                nf_forma = st.selectbox("Forma de Pagamento", options=FORMAS_PAGAMENTO, key="fp_nf_cx")
+                nf_valor = st.number_input("Valor Total do Documento (R$) *", min_value=0.01, value=50.0, step=10.0)
+                nf_arquivo = st.file_uploader(
+                    "Selecione o arquivo da Nota Fiscal ou Comprovante (.pdf, .jpg, .png) *",
+                    type=["pdf", "png", "jpg", "jpeg"],
+                    key="up_caixa_nf",
+                )
+
+                if st.form_submit_button("Enviar para o Google Drive & Registrar", use_container_width=True):
+                    if nf_arquivo is None:
+                        st.error("Selecione um arquivo PDF ou imagem para fazer o upload.")
+                    elif not nf_forn.strip():
+                        st.error("Informe o nome do fornecedor.")
+                    else:
+                        link_drive = db.upload_arquivo_drive(
+                            arquivo_bytes=nf_arquivo.read(),
+                            nome_arquivo=nf_arquivo.name,
+                            mime_type=nf_arquivo.type or "application/octet-stream",
+                            subpasta=nf_subpasta,
+                        )
+                        ok_nf, id_nf = db.registrar_lancamento_financeiro(
+                            data_lancamento=nf_data.strftime("%Y-%m-%d"),
+                            tipo="Despesa",
+                            natureza_custo="Custo Variável",
+                            descricao=f"Documento: {nf_arquivo.name}",
+                            categoria=nf_cat,
+                            fornecedor=nf_forn,
+                            forma_pagamento=nf_forma,
+                            valor=nf_valor,
+                            link_comprovante=link_drive,
+                            responsavel=USUARIO_ATUAL,
+                        )
+                        if ok_nf:
+                            registrar_log(
+                                usuario=USUARIO_ATUAL,
+                                perfil=PERFIL_ATUAL,
+                                acao=f"Upload de '{nf_arquivo.name}' em /{nf_subpasta} e registro de nota ({id_nf}) de '{nf_forn}' ({formatar_moeda(nf_valor)})",
+                                modulo="Caixa",
+                            )
+                            st.success(f"Arquivo enviado para /{nf_subpasta} e registrado ({id_nf})!")
+                            st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+        return
+
+    # ==========================================================================
+    # VISÃO COMPLETA: PERFIS DEV E GERENTE
+    # ==========================================================================
+    st.markdown(
+        '<div style="margin-bottom: 16px;">'
+        '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">💰 Gestão Financeira, DRE &amp; Controle de Notas Fiscais</h1>'
+        '<p style="color:#687787; font-size:0.9rem; margin:0;">Análise interativa de fluxo de caixa, faturamento, custos fixos/variáveis e comprovantes arquivados no Google Drive.</p>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    df_fin = db.ler_aba("Financeiro").copy()
+    df_fin["Valor"] = pd.to_numeric(df_fin["Valor"], errors="coerce").fillna(0.0)
+    df_fin["Data_dt"] = pd.to_datetime(df_fin["Data"], errors="coerce").dt.date
+
+    # 1. PAINEL DE FILTROS INTERATIVOS NO TOPO (VISÃO DEV E GERENTE)
+    st.markdown('<div class="mazon-card" style="padding: 1.15rem 1.4rem;">', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-size:0.78rem; text-transform:uppercase; letter-spacing:1px; color:#9A6B1F; font-weight:600; margin-bottom:10px;">🔎 Painel de Filtros Financeiros Interativos</div>',
+        unsafe_allow_html=True,
+    )
+
+    datas_validas = df_fin["Data_dt"].dropna()
+    dt_min_padrao = datas_validas.min() if not datas_validas.empty else (date.today() - timedelta(days=30))
+    dt_max_padrao = datas_validas.max() if not datas_validas.empty else date.today()
+    if dt_min_padrao > dt_max_padrao:
+        dt_min_padrao = dt_max_padrao
+
+    fornecedores_opcoes = sorted(df_fin["Fornecedor"].astype(str).unique().tolist()) if not df_fin.empty else []
+    categorias_opcoes = sorted(df_fin["Categoria"].astype(str).unique().tolist()) if not df_fin.empty else CATEGORIAS_FINANCEIRAS
+    formas_opcoes = sorted(df_fin["Forma_Pagamento"].astype(str).unique().tolist()) if not df_fin.empty else FORMAS_PAGAMENTO
+
+    val_min_global = float(df_fin["Valor"].min()) if not df_fin.empty else 0.0
+    val_max_global = float(df_fin["Valor"].max()) if not df_fin.empty else 10000.0
+    if val_max_global <= val_min_global:
+        val_max_global = val_min_global + 1000.0
+
+    f_col1, f_col2, f_col3, f_col4 = st.columns([1.4, 1.4, 1.5, 1.5])
+    with f_col1:
+        periodo_sel = st.date_input(
+            "Período (Inicial — Final)",
+            value=(dt_min_padrao, dt_max_padrao),
+        )
+    with f_col2:
+        fornecedores_sel = st.multiselect(
+            "Fornecedor / Origem",
+            options=fornecedores_opcoes,
+            default=[],
+            placeholder="Todos os fornecedores",
+        )
+    with f_col3:
+        categorias_sel = st.multiselect(
+            "Categoria Financeira",
+            options=categorias_opcoes,
+            default=[],
+            placeholder="Todas as categorias",
+        )
+    with f_col4:
+        formas_sel = st.multiselect(
+            "Forma de Pagamento",
+            options=formas_opcoes,
+            default=[],
+            placeholder="Todas as formas",
+        )
+
+    faixa_valor = st.slider(
+        "Faixa de Valor do Lançamento (R$)",
+        min_value=0.0,
+        max_value=float(max(val_max_global, 100.0)),
+        value=(0.0, float(max(val_max_global, 100.0))),
+        step=10.0,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Aplicação dos filtros sobre df_fin
+    df_filtrado = df_fin.copy()
+    if isinstance(periodo_sel, (list, tuple)) and len(periodo_sel) == 2:
+        dt_ini, dt_fim = periodo_sel[0], periodo_sel[1]
+        df_filtrado = df_filtrado[
+            (df_filtrado["Data_dt"] >= dt_ini) & (df_filtrado["Data_dt"] <= dt_fim)
+        ]
+    elif isinstance(periodo_sel, date):
+        df_filtrado = df_filtrado[df_filtrado["Data_dt"] >= periodo_sel]
+
+    if fornecedores_sel:
+        df_filtrado = df_filtrado[df_filtrado["Fornecedor"].isin(fornecedores_sel)]
+    if categorias_sel:
+        df_filtrado = df_filtrado[df_filtrado["Categoria"].isin(categorias_sel)]
+    if formas_sel:
+        df_filtrado = df_filtrado[df_filtrado["Forma_Pagamento"].isin(formas_sel)]
+
+    df_filtrado = df_filtrado[
+        (df_filtrado["Valor"] >= faixa_valor[0]) & (df_filtrado["Valor"] <= faixa_valor[1])
+    ]
+
+    # 2. CARTÕES DE MÉTRICAS CONSOLIDADAS (REATIVOS AOS FILTROS)
+    faturamento_bruto = float(df_filtrado[df_filtrado["Tipo"] == "Receita"]["Valor"].sum())
+    df_despesas = df_filtrado[df_filtrado["Tipo"] == "Despesa"]
+    custos_variaveis = float(
+        df_despesas[df_despesas["Natureza_Custo"] == "Custo Variável"]["Valor"].sum()
+    )
+    custos_fixos = float(
+        df_despesas[df_despesas["Natureza_Custo"] == "Custo Fixo"]["Valor"].sum()
+    )
+    despesas_totais = float(df_despesas["Valor"].sum())
+    lucro_liquido = faturamento_bruto - despesas_totais
+    margem_liquida = (lucro_liquido / faturamento_bruto * 100.0) if faturamento_bruto > 0 else 0.0
+
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        st.markdown(
+            '<div class="mazon-kpi-card">'
+            '<div class="mazon-kpi-label">Faturamento Bruto</div>'
+            f'<div class="mazon-kpi-value">{formatar_moeda(faturamento_bruto)}</div>'
+            f'<div class="mazon-kpi-sub">{len(df_filtrado[df_filtrado["Tipo"] == "Receita"])} lançamentos de receita</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    with k2:
+        st.markdown(
+            '<div class="mazon-kpi-card">'
+            '<div class="mazon-kpi-label">Custos Fixos &amp; Variáveis</div>'
+            f'<div class="mazon-kpi-value" style="color:#D9383A;">{formatar_moeda(despesas_totais)}</div>'
+            f'<div class="mazon-kpi-sub">Var: {formatar_moeda(custos_variaveis)} · Fixo: {formatar_moeda(custos_fixos)}</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    with k3:
+        cor_lucro = "#1F9D55" if lucro_liquido >= 0 else "#D9383A"
+        st.markdown(
+            '<div class="mazon-kpi-card">'
+            '<div class="mazon-kpi-label">Lucro Líquido</div>'
+            f'<div class="mazon-kpi-value" style="color:{cor_lucro};">{formatar_moeda(lucro_liquido)}</div>'
+            '<div class="mazon-kpi-sub">Resultado operacional no período filtrado</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    with k4:
+        cor_margem = "#1F9D55" if margem_liquida >= 0 else "#D9383A"
+        st.markdown(
+            '<div class="mazon-kpi-card">'
+            '<div class="mazon-kpi-label">Margem Líquida (%)</div>'
+            f'<div class="mazon-kpi-value" style="color:{cor_margem};">{margem_liquida:.1f}%</div>'
+            '<div class="mazon-kpi-sub">Lucro Líquido / Faturamento Bruto</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+
+    # 3. GRÁFICOS INTERATIVOS PLOTLY (Fluxo de Caixa, DRE Simplificada, Faturamento por Período, Despesas por Categoria)
+    g_col1, g_col2 = st.columns(2)
+
+    with g_col1:
+        st.markdown(
+            '<div class="mazon-card" style="margin-bottom:8px; padding:1.1rem 1.4rem 0.4rem 1.4rem;">'
+            '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">📊 DRE Simplificada (Cascata de Resultado)</h4>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        fig_dre = go.Figure(
+            go.Waterfall(
+                name="DRE",
+                orientation="v",
+                measure=["relative", "relative", "relative", "total"],
+                x=[
+                    "Faturamento Bruto",
+                    "(-) Custos Variáveis",
+                    "(-) Custos Fixos",
+                    "(=) Lucro Líquido",
+                ],
+                textposition="outside",
+                text=[
+                    formatar_moeda(faturamento_bruto),
+                    f"-{formatar_moeda(custos_variaveis)}",
+                    f"-{formatar_moeda(custos_fixos)}",
+                    formatar_moeda(lucro_liquido),
+                ],
+                y=[faturamento_bruto, -custos_variaveis, -custos_fixos, lucro_liquido],
+                connector={"line": {"color": "#687787"}},
+                increasing={"marker": {"color": "#1F9D55"}},
+                decreasing={"marker": {"color": "#D9383A"}},
+                totals={"marker": {"color": "#0B1B2B"}},
+            )
+        )
+        fig_dre.update_layout(
+            paper_bgcolor="#FFFFFF",
+            plot_bgcolor="#FFFFFF",
+            font=dict(color="#0B1B2B", family="Poppins"),
+            yaxis=dict(title="R$", gridcolor="#EBE4D8"),
+            margin=dict(l=15, r=15, t=25, b=15),
+            height=340,
+        )
+        st.plotly_chart(fig_dre, use_container_width=True)
+
+    with g_col2:
+        st.markdown(
+            '<div class="mazon-card" style="margin-bottom:8px; padding:1.1rem 1.4rem 0.4rem 1.4rem;">'
+            '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">📈 Fluxo de Caixa &amp; Faturamento por Período</h4>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if not df_filtrado.empty:
+            df_fluxo = (
+                df_filtrado.groupby(["Data", "Tipo"], as_index=False)["Valor"]
+                .sum()
+                .sort_values("Data")
+            )
+            fig_fluxo = px.bar(
+                df_fluxo,
+                x="Data",
+                y="Valor",
+                color="Tipo",
+                barmode="group",
+                color_discrete_map={"Receita": "#0B1B2B", "Despesa": "#D4A24C"},
+            )
+            fig_fluxo.update_layout(
+                paper_bgcolor="#FFFFFF",
+                plot_bgcolor="#FFFFFF",
+                font=dict(color="#0B1B2B", family="Poppins"),
+                xaxis=dict(title="Data", gridcolor="#EBE4D8"),
+                yaxis=dict(title="Valor (R$)", gridcolor="#EBE4D8"),
+                margin=dict(l=15, r=15, t=25, b=15),
+                height=340,
+            )
+            st.plotly_chart(fig_fluxo, use_container_width=True)
+        else:
+            st.info("Sem lançamentos para o período selecionado.")
+
+    g_col3, g_col4 = st.columns(2)
+    with g_col3:
+        st.markdown(
+            '<div class="mazon-card" style="margin-bottom:8px; padding:1.1rem 1.4rem 0.4rem 1.4rem;">'
+            '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">🍩 Distribuição de Despesas por Categoria</h4>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if not df_despesas.empty:
+            df_desp_cat = df_despesas.groupby("Categoria", as_index=False)["Valor"].sum()
+            fig_desp = px.pie(
+                df_desp_cat,
+                names="Categoria",
+                values="Valor",
+                hole=0.58,
+                color_discrete_sequence=["#0B1B2B", "#D4A24C", "#1C354D", "#C59237", "#526375", "#D9383A"],
+            )
+            fig_desp.update_traces(textinfo="percent+label", textfont_color="#0B1B2B")
+            fig_desp.update_layout(
+                paper_bgcolor="#FFFFFF",
+                plot_bgcolor="#FFFFFF",
+                font=dict(color="#0B1B2B", family="Poppins"),
+                showlegend=False,
+                margin=dict(l=10, r=10, t=15, b=15),
+                height=320,
+            )
+            st.plotly_chart(fig_desp, use_container_width=True)
+        else:
+            st.info("Nenhuma despesa nos filtros selecionados.")
+
+    with g_col4:
+        st.markdown(
+            '<div class="mazon-card" style="margin-bottom:8px; padding:1.1rem 1.4rem 0.4rem 1.4rem;">'
+            '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">💳 Faturamento por Forma de Pagamento</h4>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        df_rec = df_filtrado[df_filtrado["Tipo"] == "Receita"]
+        if not df_rec.empty:
+            df_rec_fp = df_rec.groupby("Forma_Pagamento", as_index=False)["Valor"].sum()
+            fig_fp = px.bar(
+                df_rec_fp,
+                x="Valor",
+                y="Forma_Pagamento",
+                orientation="h",
+                text=df_rec_fp["Valor"].apply(formatar_moeda),
+                color_discrete_sequence=["#0B1B2B"],
+            )
+            fig_fp.update_traces(textposition="outside")
+            fig_fp.update_layout(
+                paper_bgcolor="#FFFFFF",
+                plot_bgcolor="#FFFFFF",
+                font=dict(color="#0B1B2B", family="Poppins"),
+                xaxis=dict(title="Valor (R$)", gridcolor="#EBE4D8"),
+                yaxis=dict(title=""),
+                margin=dict(l=10, r=90, t=15, b=15),
+                height=320,
+            )
+            st.plotly_chart(fig_fp, use_container_width=True)
+        else:
+            st.info("Nenhuma receita nos filtros selecionados.")
+
+    # 4. FORMULÁRIO DE NOVO LANÇAMENTO FINANCEIRO E UPLOAD DE NOTA FISCAL / COMPROVANTE
+    with st.expander("➕ Novo Lançamento Financeiro / Upload de Nota Fiscal ou Comprovante (Google Drive)", expanded=False):
+        with st.form("form_lancamento_completo"):
+            c_l1, c_l2, c_l3, c_l4 = st.columns(4)
+            with c_l1:
+                l_data = st.date_input("Data", value=date.today())
+                l_tipo = st.selectbox("Tipo *", options=["Receita", "Despesa"])
+            with c_l2:
+                l_natureza = st.selectbox(
+                    "Natureza",
+                    options=["Faturamento Bruto", "Custo Variável", "Custo Fixo"],
+                )
+                l_cat = st.selectbox("Categoria *", options=CATEGORIAS_FINANCEIRAS)
+            with c_l3:
+                l_forn = st.text_input("Fornecedor / Cliente", placeholder="Ex: Mar & Cia Imports")
+                l_forma = st.selectbox("Forma de Pagamento", options=FORMAS_PAGAMENTO)
+            with c_l4:
+                l_valor = st.number_input("Valor (R$) *", min_value=0.01, value=100.0, step=10.0)
+                l_subpasta = st.selectbox("Subpasta no Drive", options=["Notas_Fiscais", "Comprovantes"])
+
+            l_desc = st.text_input("Descrição Detalhada *", placeholder="Ex: NF 882 Compra de Salmão ou Fechamento Jantar")
+            l_arq = st.file_uploader(
+                "Anexar Nota Fiscal ou Comprovante (.pdf, .png, .jpg) — Upload automático para a pasta principal no Google Drive",
+                type=["pdf", "png", "jpg", "jpeg"],
+            )
+
+            if st.form_submit_button("Salvar Lançamento & Arquivar Documento"):
+                link_doc = "-"
+                if l_arq is not None:
+                    link_doc = db.upload_arquivo_drive(
+                        arquivo_bytes=l_arq.read(),
+                        nome_arquivo=l_arq.name,
+                        mime_type=l_arq.type or "application/octet-stream",
+                        subpasta=l_subpasta,
+                    )
+                    registrar_log(
+                        usuario=USUARIO_ATUAL,
+                        perfil=PERFIL_ATUAL,
+                        acao=f"Upload de arquivo '{l_arq.name}' para /{l_subpasta} no Google Drive",
+                        modulo="Financeiro",
+                    )
+
+                ok_l, id_gerado = db.registrar_lancamento_financeiro(
+                    data_lancamento=l_data.strftime("%Y-%m-%d"),
+                    tipo=l_tipo,
+                    natureza_custo=l_natureza,
+                    descricao=l_desc,
+                    categoria=l_cat,
+                    fornecedor=l_forn,
+                    forma_pagamento=l_forma,
+                    valor=l_valor,
+                    link_comprovante=link_doc,
+                    responsavel=USUARIO_ATUAL,
+                )
+                if ok_l:
+                    registrar_log(
+                        usuario=USUARIO_ATUAL,
+                        perfil=PERFIL_ATUAL,
+                        acao=f"Novo lançamento financeiro ({id_gerado}) - {l_tipo}: {formatar_moeda(l_valor)} ({l_cat})",
+                        modulo="Financeiro",
+                    )
+                    st.success(f"Lançamento {id_gerado} registrado com sucesso!")
+                    st.rerun()
+
+    # 5. TABELA DETALHADA DE LANÇAMENTOS E NOTAS FISCAIS CADASTRADAS
+    st.markdown("#### 📋 Lançamentos e Notas Fiscais Cadastradas")
+    linhas_fin_html = []
+    for _, row in df_filtrado.sort_values("Data", ascending=False).iterrows():
+        cor_tipo = "#1F9D55" if row["Tipo"] == "Receita" else "#D9383A"
+        link_str = str(row.get("Link_Comprovante", "-"))
+        link_html = (
+            f'<a href="{link_str}" target="_blank" style="color:#9A6B1F; font-weight:600; text-decoration:underline;">Abrir no Drive</a>'
+            if link_str.startswith("http")
+            else '<span style="color:#687787;">—</span>'
+        )
+        linhas_fin_html.append(
+            "<tr>"
+            f'<td style="font-weight:600; color:#9A6B1F;">{row["ID_Lancamento"]}</td>'
+            f'<td>{row["Data"]}</td>'
+            f'<td style="font-weight:600; color:{cor_tipo};">{row["Tipo"]}</td>'
+            f'<td>{row["Natureza_Custo"]}</td>'
+            f'<td style="font-weight:500;">{row["Descricao"]}</td>'
+            f'<td>{row["Categoria"]}</td>'
+            f'<td>{row["Fornecedor"]}</td>'
+            f'<td>{row["Forma_Pagamento"]}</td>'
+            f'<td style="font-weight:600; color:{cor_tipo};">{formatar_moeda(float(row["Valor"]))}</td>'
+            f"<td>{link_html}</td>"
+            f'<td style="color:#687787;">{row["Responsavel"]}</td>'
+            "</tr>"
+        )
+
+    corpo_fin = "".join(linhas_fin_html) if linhas_fin_html else (
+        '<tr><td colspan="11" style="text-align:center; color:#687787; padding:18px;">Nenhum lançamento encontrado para os filtros aplicados.</td></tr>'
+    )
+
+    st.markdown(
+        '<div class="mazon-table-wrapper">'
+        '<table class="mazon-table">'
+        "<thead>"
+        "<tr>"
+        "<th>ID</th>"
+        "<th>Data</th>"
+        "<th>Tipo</th>"
+        "<th>Natureza</th>"
+        "<th>Descrição</th>"
+        "<th>Categoria</th>"
+        "<th>Fornecedor</th>"
+        "<th>Pagamento</th>"
+        "<th>Valor</th>"
+        "<th>Comprovante / NF</th>"
+        "<th>Responsável</th>"
+        "</tr>"
+        "</thead>"
+        f"<tbody>{corpo_fin}</tbody>"
+        "</table>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # 6. TRAVA RIGOROSA DE EXCLUSÃO: EXCLUSIVAMENTE QUANDO st.session_state['usuario'] == 'Arthur'
+    if st.session_state.get("usuario") == "Arthur":
+        with st.expander("🗑️ Exclusão de Lançamentos Financeiros / Notas Fiscais (Exclusivo Arthur - Dev)", expanded=False):
+            st.warning(
+                "Atenção: Esta ação remove definitivamente o lançamento ou nota fiscal da planilha unificada e registra o evento no Log de Auditoria."
+            )
+            ids_disponiveis = df_fin["ID_Lancamento"].astype(str).tolist() if not df_fin.empty else []
+            if ids_disponiveis:
+                col_del1, col_del2 = st.columns([3, 1.2])
+                with col_del1:
+                    id_para_excluir = st.selectbox(
+                        "Selecione o ID do Lançamento / Nota Fiscal para excluir:",
+                        options=ids_disponiveis,
+                        key="sel_delete_arthur",
+                    )
+                with col_del2:
+                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                    if st.button("🗑️ Excluir Registro", key="btn_delete_arthur", use_container_width=True):
+                        if st.session_state.get("usuario") == "Arthur":
+                            ok_del, msg_del = db.excluir_lancamento_financeiro(
+                                id_lancamento=id_para_excluir,
+                                usuario_logado=USUARIO_ATUAL,
+                                perfil_logado=PERFIL_ATUAL,
+                            )
+                            if ok_del:
+                                st.success(msg_del)
+                                st.rerun()
+                            else:
+                                st.error(msg_del)
+
+
+def renderizar_tab_auditoria() -> None:
+    """
+    🛡️ Tab Auditoria:
+    - Dev (Arthur): Acesso completo ao Log Geral (100% dos eventos).
+    - Gerente (Claudio): Filtro automático exibindo apenas logs referentes aos módulos de Estoque e Caixa.
+    """
+    st.markdown(
+        '<div style="margin-bottom: 16px;">'
+        '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">🛡️ Logs de Auditoria &amp; Rastreabilidade</h1>'
+        '<p style="color:#687787; font-size:0.9rem; margin:0;">Monitoramento contínuo de operações gravado automaticamente na aba <code>Logs_Auditoria</code> da planilha unificada.</p>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    df_logs = db.ler_aba("Logs_Auditoria").copy()
+
+    if PERFIL_ATUAL == "Gerente":
+        st.info(
+            "🔎 Visão Gerencial (Claudio): Exibindo automaticamente apenas os eventos referentes aos módulos de **Estoque** e **Caixa**."
+        )
+        df_logs = df_logs[df_logs["Modulo"].astype(str).isin(["Estoque", "Caixa"])].copy()
+    else:
+        st.markdown(
+            '<div class="mazon-card" style="padding:0.9rem 1.3rem;">'
+            '<span class="badge-best-price">ACESSO TOTAL DEV (ARTHUR)</span>'
+            '<span style="margin-left:10px; font-size:0.86rem; color:#0B1B2B;">Visualizando 100% do Log Geral de Auditoria (Autenticação, Usuários, Estoque, Caixa e Financeiro).</span>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    col_a1, col_a2 = st.columns(2)
+    with col_a1:
+        busca_log = st.text_input("Filtrar por Usuário ou Ação", placeholder="Ex: Arthur, Salmão, Login...")
+    with col_a2:
+        modulos_disp = sorted(df_logs["Modulo"].astype(str).unique().tolist()) if not df_logs.empty else []
+        filtro_mod = st.multiselect("Filtrar por Módulo", options=modulos_disp, default=[])
+
+    if busca_log.strip():
+        termo_l = busca_log.strip().lower()
+        df_logs = df_logs[
+            df_logs["Usuario"].astype(str).str.lower().str.contains(termo_l)
+            | df_logs["Acao"].astype(str).str.lower().str.contains(termo_l)
+        ]
+    if filtro_mod:
+        df_logs = df_logs[df_logs["Modulo"].isin(filtro_mod)]
+
+    df_logs = df_logs.iloc[::-1]  # Mais recentes no topo
+
+    linhas_log_html = []
+    for _, row in df_logs.iterrows():
+        linhas_log_html.append(
+            "<tr>"
+            f'<td style="color:#687787; font-size:0.82rem;">{row["Data_Hora"]}</td>'
+            f'<td style="font-weight:600; color:#0B1B2B;">{row["Usuario"]}</td>'
+            f'<td><span class="badge-alerta">{row["Perfil"]}</span></td>'
+            f'<td>{row["Acao"]}</td>'
+            f'<td style="font-weight:600; color:#9A6B1F;">{row["Modulo"]}</td>'
+            "</tr>"
+        )
+
+    corpo_logs = "".join(linhas_log_html) if linhas_log_html else (
+        '<tr><td colspan="5" style="text-align:center; color:#687787; padding:18px;">Nenhum registro de auditoria encontrado.</td></tr>'
+    )
+
+    st.markdown(
+        '<div class="mazon-table-wrapper">'
+        '<table class="mazon-table">'
+        "<thead>"
+        "<tr>"
+        "<th>Data / Hora</th>"
+        "<th>Usuário</th>"
+        "<th>Perfil</th>"
+        "<th>Ação Executada</th>"
+        "<th>Módulo</th>"
+        "</tr>"
+        "</thead>"
+        f"<tbody>{corpo_logs}</tbody>"
+        "</table>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ==============================================================================
+# NAVEGAÇÃO POR TABS SUPERIORES DINÂMICAS (st.tabs) CONFORME O PERFIL LOGADO
+# ==============================================================================
+if PERFIL_ATUAL in ["Dev", "Gerente"]:
+    tab_home, tab_estoque, tab_fin, tab_auditoria = st.tabs(
+        ["🏠 Home", "📦 Estoque", "💰 Gestão Financeira", "🛡️ Auditoria"]
+    )
+    with tab_home:
+        renderizar_tab_home()
+    with tab_estoque:
+        renderizar_tab_estoque()
+    with tab_fin:
+        renderizar_tab_financeiro()
+    with tab_auditoria:
+        renderizar_tab_auditoria()
+
+elif PERFIL_ATUAL == "Caixa":
+    tab_home, tab_estoque, tab_caixa = st.tabs(
+        ["🏠 Home", "📦 Estoque", "💰 Lançamentos / Caixa"]
+    )
+    with tab_home:
+        renderizar_tab_home()
+    with tab_estoque:
+        renderizar_tab_estoque()
+    with tab_caixa:
+        renderizar_tab_financeiro()
+
+else:  # Perfil Equipe
+    tab_home, tab_estoque = st.tabs(["🏠 Home", "📦 Estoque"])
+    with tab_home:
+        renderizar_tab_home()
+    with tab_estoque:
+        renderizar_tab_estoque()
