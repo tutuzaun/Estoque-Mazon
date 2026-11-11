@@ -350,7 +350,7 @@ def renderizar_tela_login() -> None:
         )
 
         with st.form("form_login_mazon", clear_on_submit=False):
-            in_usuario = st.text_input("Usuário", placeholder="Ex: Arthur, Claudio, Caixa, Equipe")
+            in_usuario = st.text_input("Usuário", placeholder="Digite seu usuário")
             in_senha = st.text_input("Senha", type="password", placeholder="Digite sua senha")
             btn_entrar = st.form_submit_button("Entrar no Sistema", use_container_width=True)
 
@@ -516,11 +516,13 @@ def renderizar_tab_home() -> None:
     Apresenta resumo executivo customizado conforme o perfil logado:
     - Dev / Gerente: Cartões de métricas financeiras e de estoque do dia + gráficos executivos.
     - Caixa: Atalhos de rotina de fechamento e resumo dos lançamentos do dia.
-    - Equipe: Alertas operacionais de itens com estoque baixo/crítico ou pendentes de contagem.
+    - Equipe: Alertas operacionais de itens com estoque baixo/crítico.
+    Se a planilha estiver sem lançamentos/contagens, exibe estritamente R$ 0,00 e 0 em contagens.
     """
     hoje_str = datetime.now().strftime("%Y-%m-%d")
     df_estoque = db.obter_estoque_enriquecido()
-    df_criticos = df_estoque[df_estoque["Status"].isin(["CRÍTICO/FALTA", "PENDENTE", "ALERTA"])].copy()
+    df_criticos = df_estoque[df_estoque["Status"].isin(["CRÍTICO/FALTA", "ALERTA"])].copy()
+    itens_contados = int((df_estoque["Qtd_Atual"] > 0).sum()) if not df_estoque.empty else 0
 
     st.markdown(
         f'<div style="margin-bottom: 18px;">'
@@ -536,10 +538,10 @@ def renderizar_tab_home() -> None:
         df_fin["Valor"] = pd.to_numeric(df_fin["Valor"], errors="coerce").fillna(0.0)
 
         df_hoje = df_fin[df_fin["Data"].astype(str) == hoje_str]
-        fat_hoje = float(df_hoje[df_hoje["Tipo"] == "Receita"]["Valor"].sum())
-        desp_hoje = float(df_hoje[df_hoje["Tipo"] == "Despesa"]["Valor"].sum())
-        fat_acumulado = float(df_fin[df_fin["Tipo"] == "Receita"]["Valor"].sum())
-        desp_acumulada = float(df_fin[df_fin["Tipo"] == "Despesa"]["Valor"].sum())
+        fat_hoje = float(df_hoje[df_hoje["Tipo"] == "Receita"]["Valor"].sum()) if not df_hoje.empty else 0.0
+        desp_hoje = float(df_hoje[df_hoje["Tipo"] == "Despesa"]["Valor"].sum()) if not df_hoje.empty else 0.0
+        fat_acumulado = float(df_fin[df_fin["Tipo"] == "Receita"]["Valor"].sum()) if not df_fin.empty else 0.0
+        desp_acumulada = float(df_fin[df_fin["Tipo"] == "Despesa"]["Valor"].sum()) if not df_fin.empty else 0.0
         saldo_liquido = fat_acumulado - desp_acumulada
 
         c1, c2, c3, c4 = st.columns(4)
@@ -565,14 +567,14 @@ def renderizar_tab_home() -> None:
         with c3:
             st.markdown(
                 '<div class="mazon-kpi-card">'
-                '<div class="mazon-kpi-label">Insumos em Alerta / Pendentes</div>'
+                '<div class="mazon-kpi-label">Insumos em Alerta Crítico</div>'
                 f'<div class="mazon-kpi-value" style="color:#D9383A;">{len(df_criticos)}</div>'
-                f'<div class="mazon-kpi-sub">De {len(df_estoque)} insumos oficiais monitorados</div>'
+                f'<div class="mazon-kpi-sub">Contagens ativas em estoque: {itens_contados}</div>'
                 "</div>",
                 unsafe_allow_html=True,
             )
         with c4:
-            valor_est = float(df_estoque["Valor_Total_Item"].sum())
+            valor_est = float(df_estoque["Valor_Total_Item"].sum()) if not df_estoque.empty else 0.0
             st.markdown(
                 '<div class="mazon-kpi-card">'
                 '<div class="mazon-kpi-label">Capital em Estoque</div>'
@@ -592,7 +594,7 @@ def renderizar_tab_home() -> None:
                 "</div>",
                 unsafe_allow_html=True,
             )
-            if not df_fin.empty:
+            if not df_fin.empty and float(df_fin["Valor"].sum()) > 0.0:
                 df_resumo_dia = (
                     df_fin.groupby(["Data", "Tipo"], as_index=False)["Valor"].sum()
                 )
@@ -614,53 +616,61 @@ def renderizar_tab_home() -> None:
                     height=330,
                 )
                 st.plotly_chart(fig_home, use_container_width=True)
+            else:
+                st.info("Nenhum lançamento financeiro registrado na planilha (Faturamento: R$ 0,00 | Despesas: R$ 0,00).")
         with col_g2:
             st.markdown(
                 '<div class="mazon-card" style="margin-bottom: 8px; padding: 1.15rem 1.4rem 0.4rem 1.4rem;">'
-                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Distribuição de Insumos por Categoria</h4>'
+                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Saldo Contado por Categoria</h4>'
                 "</div>",
                 unsafe_allow_html=True,
             )
-            df_contagem_cat = (
-                df_estoque.groupby("Categoria", as_index=False)["ID"]
-                .count()
-                .rename(columns={"ID": "Qtd_Itens"})
-            )
-            fig_pie = px.pie(
-                df_contagem_cat,
-                names="Categoria",
-                values="Qtd_Itens",
-                hole=0.6,
-                color_discrete_sequence=[
-                    "#0B1B2B",
-                    "#D4A24C",
-                    "#1C354D",
-                    "#C59237",
-                    "#34506B",
-                    "#E0B86B",
-                    "#526375",
-                    "#8A6D3B",
-                    "#B8ADA0",
-                ],
-            )
-            fig_pie.update_traces(textinfo="percent+label", textfont_color="#0B1B2B")
-            fig_pie.update_layout(
-                paper_bgcolor="#FFFFFF",
-                plot_bgcolor="#FFFFFF",
-                font=dict(color="#0B1B2B", family="Poppins"),
-                showlegend=False,
-                margin=dict(l=10, r=10, t=10, b=10),
-                height=330,
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
+            df_com_saldo = df_estoque[df_estoque["Qtd_Atual"] > 0].copy()
+            if not df_com_saldo.empty:
+                df_contagem_cat = (
+                    df_com_saldo.groupby("Categoria", as_index=False)["Qtd_Atual"]
+                    .sum()
+                    .rename(columns={"Qtd_Atual": "Saldo_Total"})
+                )
+                fig_pie = px.pie(
+                    df_contagem_cat,
+                    names="Categoria",
+                    values="Saldo_Total",
+                    hole=0.6,
+                    color_discrete_sequence=[
+                        "#0B1B2B",
+                        "#D4A24C",
+                        "#1C354D",
+                        "#C59237",
+                        "#34506B",
+                        "#E0B86B",
+                        "#526375",
+                        "#8A6D3B",
+                        "#B8ADA0",
+                    ],
+                )
+                fig_pie.update_traces(textinfo="percent+label", textfont_color="#0B1B2B")
+                fig_pie.update_layout(
+                    paper_bgcolor="#FFFFFF",
+                    plot_bgcolor="#FFFFFF",
+                    font=dict(color="#0B1B2B", family="Poppins"),
+                    showlegend=False,
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    height=330,
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                st.info("Nenhuma contagem de estoque registrada na planilha (Contagens: 0).")
 
     # 2. VISÃO CAIXA (ATALHOS DE ROTINA OPERACIONAL)
     elif PERFIL_ATUAL == "Caixa":
-        df_fin_caixa = db.ler_aba("Financeiro")
+        df_fin_caixa = db.ler_aba("Financeiro").copy()
+        df_fin_caixa["Valor"] = pd.to_numeric(df_fin_caixa["Valor"], errors="coerce").fillna(0.0)
         lancamentos_hoje_caixa = df_fin_caixa[
             (df_fin_caixa["Data"].astype(str) == hoje_str)
             & (df_fin_caixa["Responsavel"].astype(str) == USUARIO_ATUAL)
         ]
+        total_hoje_caixa = float(lancamentos_hoje_caixa["Valor"].sum()) if not lancamentos_hoje_caixa.empty else 0.0
 
         c_cx1, c_cx2, c_cx3 = st.columns(3)
         with c_cx1:
@@ -668,7 +678,7 @@ def renderizar_tab_home() -> None:
                 '<div class="mazon-kpi-card">'
                 '<div class="mazon-kpi-label">Seus Lançamentos Hoje</div>'
                 f'<div class="mazon-kpi-value">{len(lancamentos_hoje_caixa)}</div>'
-                '<div class="mazon-kpi-sub">Registros enviados para a planilha central</div>'
+                f'<div class="mazon-kpi-sub">Total registrado hoje: {formatar_moeda(total_hoje_caixa)}</div>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -703,7 +713,39 @@ def renderizar_tab_home() -> None:
             unsafe_allow_html=True,
         )
 
-    # 3. ALERTAS DE ESTOQUE BAIXO / PENDENTE (EXIBIDO PARA EQUIPE E TODOS OS PERFIS)
+    # 3. VISÃO EQUIPE (CARTÕES OPERACIONAIS DE CONTAGEM E ALERTA)
+    else:
+        c_eq1, c_eq2, c_eq3 = st.columns(3)
+        with c_eq1:
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Insumos em Alerta Crítico</div>'
+                f'<div class="mazon-kpi-value" style="color:#D9383A;">{len(df_criticos)}</div>'
+                '<div class="mazon-kpi-sub">Itens abaixo do estoque mínimo definido</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with c_eq2:
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Contagens Ativas Registradas</div>'
+                f'<div class="mazon-kpi-value">{itens_contados}</div>'
+                '<div class="mazon-kpi-sub">Itens com saldo físico maior que zero</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with c_eq3:
+            valor_est_eq = float(df_estoque["Valor_Total_Item"].sum()) if not df_estoque.empty else 0.0
+            st.markdown(
+                '<div class="mazon-kpi-card">'
+                '<div class="mazon-kpi-label">Valor Estimado em Estoque</div>'
+                f'<div class="mazon-kpi-value">{formatar_moeda(valor_est_eq)}</div>'
+                '<div class="mazon-kpi-sub">Soma das quantidades × custo unitário</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+    # 4. ALERTAS DE ESTOQUE BAIXO (EXIBIDO QUANDO HOUVER ITENS CRÍTICOS/ALERTA)
     if not df_criticos.empty:
         pills_list = []
         for _, row in df_criticos.iterrows():
@@ -728,11 +770,11 @@ def renderizar_tab_home() -> None:
         st.markdown(
             '<div class="critical-hero-card">'
             '<div class="critical-hero-header">'
-            f'<div class="critical-hero-title">⚠️ Alertas de Estoque Baixo ou Pendentes de Contagem ({len(df_criticos)} itens)</div>'
+            f'<div class="critical-hero-title">⚠️ Alertas de Estoque Baixo ({len(df_criticos)} itens)</div>'
             '<span class="badge-best-price">Atenção Operacional</span>'
             "</div>"
             '<p style="color:#687787; font-size:0.85rem; margin:0;">'
-            "Verifique os insumos abaixo para reposição imediata ou atualização de contagem física:"
+            "Verifique os insumos abaixo para reposição imediata:"
             "</p>"
             f'<div class="critical-items-grid">{pills_html}</div>'
             "</div>",
@@ -848,40 +890,43 @@ def renderizar_tab_estoque() -> None:
             with cm2:
                 mov_tipo = st.selectbox("Tipo de Movimento", options=["Entrada (+)", "Saída / Baixa (-)"])
             with cm3:
-                mov_qtd = st.number_input("Quantidade Movimentada", min_value=0.01, value=1.0, step=0.5)
+                mov_qtd = st.number_input("Quantidade Movimentada", min_value=0.0, value=0.0, step=0.5)
             with cm4:
-                mov_obs = st.text_input("Motivo / NF / Observação", placeholder="Ex: Recebimento NF 402 ou Consumo Cozinha")
+                mov_obs = st.text_input("Motivo / NF / Observação", placeholder="Ex: Recebimento NF ou Consumo Cozinha")
 
             if st.form_submit_button("Confirmar Movimentação de Estoque"):
-                linha_item = df_estoque[df_estoque["Item"] == mov_item].iloc[0]
-                qtd_antiga = float(linha_item["Qtd_Atual"])
-                if mov_tipo.startswith("Entrada"):
-                    nova_qtd = qtd_antiga + float(mov_qtd)
+                if mov_qtd <= 0.0:
+                    st.error("Informe uma quantidade movimentada maior que zero.")
                 else:
-                    nova_qtd = max(0.0, qtd_antiga - float(mov_qtd))
+                    linha_item = df_estoque[df_estoque["Item"] == mov_item].iloc[0]
+                    qtd_antiga = float(linha_item["Qtd_Atual"])
+                    if mov_tipo.startswith("Entrada"):
+                        nova_qtd = qtd_antiga + float(mov_qtd)
+                    else:
+                        nova_qtd = max(0.0, qtd_antiga - float(mov_qtd))
 
-                ok_mov, _ = db.cadastrar_ou_atualizar_item_estoque(
-                    item_id=str(linha_item["ID"]),
-                    nome_item=str(linha_item["Item"]),
-                    categoria=str(linha_item["Categoria"]),
-                    unidade=str(linha_item["Unidade"]),
-                    qtd_atual=nova_qtd,
-                    est_minimo=float(linha_item["Est_Minimo"]),
-                    est_maximo=float(linha_item["Est_Maximo"]),
-                    preco_referencia=float(linha_item.get("Preco_Unitario", 0.0)),
-                    fornecedor_referencia=str(linha_item.get("Fornecedor", "-")),
-                )
-                if ok_mov:
-                    registrar_log(
-                        usuario=USUARIO_ATUAL,
-                        perfil=PERFIL_ATUAL,
-                        acao=f"{mov_tipo} de {mov_qtd} {linha_item['Unidade']} em '{mov_item}' (Saldo: {qtd_antiga} -> {nova_qtd}) | Obs: {mov_obs or '-'}",
-                        modulo="Estoque",
+                    ok_mov, _ = db.cadastrar_ou_atualizar_item_estoque(
+                        item_id=str(linha_item["ID"]),
+                        nome_item=str(linha_item["Item"]),
+                        categoria=str(linha_item["Categoria"]),
+                        unidade=str(linha_item["Unidade"]),
+                        qtd_atual=nova_qtd,
+                        est_minimo=float(linha_item["Est_Minimo"]),
+                        est_maximo=float(linha_item["Est_Maximo"]),
+                        preco_referencia=float(linha_item.get("Preco_Unitario", 0.0)),
+                        fornecedor_referencia=str(linha_item.get("Fornecedor", "-")),
                     )
-                    st.success(
-                        f"Movimentação registrada! Novo saldo de '{mov_item}': {nova_qtd:.2f} {linha_item['Unidade']}."
-                    )
-                    st.rerun()
+                    if ok_mov:
+                        registrar_log(
+                            usuario=USUARIO_ATUAL,
+                            perfil=PERFIL_ATUAL,
+                            acao=f"{mov_tipo} de {mov_qtd} {linha_item['Unidade']} em '{mov_item}' (Saldo: {qtd_antiga} -> {nova_qtd}) | Obs: {mov_obs or '-'}",
+                            modulo="Estoque",
+                        )
+                        st.success(
+                            f"Movimentação registrada! Novo saldo de '{mov_item}': {nova_qtd:.2f} {linha_item['Unidade']}."
+                        )
+                        st.rerun()
 
     # Aplicação dos filtros na tabela de estoque
     df_filtrado = df_estoque.copy()
@@ -944,7 +989,7 @@ def renderizar_tab_estoque() -> None:
     # Exportação da Lista de Compras (PDF / CSV) integrada à aba Estoque
     with st.expander("🛒 Gerador de Lista de Compras & Exportação em PDF / CSV", expanded=False):
         df_alerta = df_estoque[
-            df_estoque["Status"].isin(["CRÍTICO/FALTA", "ALERTA", "PENDENTE"])
+            df_estoque["Status"].isin(["CRÍTICO/FALTA", "ALERTA"])
         ].copy()
         df_alerta["Qtd_Necessaria"] = (
             df_alerta["Est_Maximo"] - df_alerta["Qtd_Atual"]
@@ -1016,7 +1061,7 @@ def renderizar_tab_financeiro() -> None:
                 )
                 cx_forma = st.selectbox("Forma de Pagamento Principal", options=FORMAS_PAGAMENTO)
                 cx_valor = st.number_input(
-                    "Valor Bruto Apurado (R$) *", min_value=0.01, value=100.0, step=50.0
+                    "Valor Bruto Apurado (R$) *", min_value=0.0, value=0.0, step=10.0
                 )
                 cx_desc = st.text_input(
                     "Observação / Turno", placeholder="Ex: Fechamento Turno Almoço / Jantar"
@@ -1028,42 +1073,45 @@ def renderizar_tab_financeiro() -> None:
                 )
 
                 if st.form_submit_button("Registrar Faturamento no Sistema", use_container_width=True):
-                    link_comp = "-"
-                    if cx_arq is not None:
-                        link_comp = db.upload_arquivo_drive(
-                            arquivo_bytes=cx_arq.read(),
-                            nome_arquivo=cx_arq.name,
-                            mime_type=cx_arq.type or "application/octet-stream",
-                            subpasta="Comprovantes",
-                        )
-                        registrar_log(
-                            usuario=USUARIO_ATUAL,
-                            perfil=PERFIL_ATUAL,
-                            acao=f"Upload de comprovante '{cx_arq.name}' para /Comprovantes no Google Drive",
-                            modulo="Caixa",
-                        )
+                    if cx_valor <= 0.0:
+                        st.error("Informe um valor bruto maior que R$ 0,00.")
+                    else:
+                        link_comp = "-"
+                        if cx_arq is not None:
+                            link_comp = db.upload_arquivo_drive(
+                                arquivo_bytes=cx_arq.read(),
+                                nome_arquivo=cx_arq.name,
+                                mime_type=cx_arq.type or "application/octet-stream",
+                                subpasta="Comprovantes",
+                            )
+                            registrar_log(
+                                usuario=USUARIO_ATUAL,
+                                perfil=PERFIL_ATUAL,
+                                acao=f"Upload de comprovante '{cx_arq.name}' para /Comprovantes no Google Drive",
+                                modulo="Caixa",
+                            )
 
-                    ok_fin, novo_id = db.registrar_lancamento_financeiro(
-                        data_lancamento=cx_data.strftime("%Y-%m-%d"),
-                        tipo="Receita",
-                        natureza_custo="Faturamento Bruto",
-                        descricao=cx_desc or f"Fechamento {cx_cat}",
-                        categoria=cx_cat,
-                        fornecedor="Cliente Final",
-                        forma_pagamento=cx_forma,
-                        valor=cx_valor,
-                        link_comprovante=link_comp,
-                        responsavel=USUARIO_ATUAL,
-                    )
-                    if ok_fin:
-                        registrar_log(
-                            usuario=USUARIO_ATUAL,
-                            perfil=PERFIL_ATUAL,
-                            acao=f"Lançamento de Faturamento Bruto ({novo_id}): {formatar_moeda(cx_valor)} via {cx_forma}",
-                            modulo="Caixa",
+                        ok_fin, novo_id = db.registrar_lancamento_financeiro(
+                            data_lancamento=cx_data.strftime("%Y-%m-%d"),
+                            tipo="Receita",
+                            natureza_custo="Faturamento Bruto",
+                            descricao=cx_desc or f"Fechamento {cx_cat}",
+                            categoria=cx_cat,
+                            fornecedor="Cliente Final",
+                            forma_pagamento=cx_forma,
+                            valor=cx_valor,
+                            link_comprovante=link_comp,
+                            responsavel=USUARIO_ATUAL,
                         )
-                        st.success(f"Faturamento {novo_id} registrado com sucesso!")
-                        st.rerun()
+                        if ok_fin:
+                            registrar_log(
+                                usuario=USUARIO_ATUAL,
+                                perfil=PERFIL_ATUAL,
+                                acao=f"Lançamento de Faturamento Bruto ({novo_id}): {formatar_moeda(cx_valor)} via {cx_forma}",
+                                modulo="Caixa",
+                            )
+                            st.success(f"Faturamento {novo_id} registrado com sucesso!")
+                            st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
         with col_up_caixa:
@@ -1075,13 +1123,13 @@ def renderizar_tab_financeiro() -> None:
                     "Pasta de Destino no Google Drive",
                     options=["Notas_Fiscais", "Comprovantes"],
                 )
-                nf_forn = st.text_input("Fornecedor / Emissor *", placeholder="Ex: Mar & Cia Imports")
+                nf_forn = st.text_input("Fornecedor / Emissor *", placeholder="Informe o fornecedor")
                 nf_cat = st.selectbox(
                     "Categoria da Despesa / Nota",
                     options=[c for c in CATEGORIAS_FINANCEIRAS if not c.startswith("Faturamento")],
                 )
                 nf_forma = st.selectbox("Forma de Pagamento", options=FORMAS_PAGAMENTO, key="fp_nf_cx")
-                nf_valor = st.number_input("Valor Total do Documento (R$) *", min_value=0.01, value=50.0, step=10.0)
+                nf_valor = st.number_input("Valor Total do Documento (R$) *", min_value=0.0, value=0.0, step=10.0)
                 nf_arquivo = st.file_uploader(
                     "Selecione o arquivo da Nota Fiscal ou Comprovante (.pdf, .jpg, .png) *",
                     type=["pdf", "png", "jpg", "jpeg"],
@@ -1093,6 +1141,8 @@ def renderizar_tab_financeiro() -> None:
                         st.error("Selecione um arquivo PDF ou imagem para fazer o upload.")
                     elif not nf_forn.strip():
                         st.error("Informe o nome do fornecedor.")
+                    elif nf_valor <= 0.0:
+                        st.error("Informe um valor maior que R$ 0,00.")
                     else:
                         link_drive = db.upload_arquivo_drive(
                             arquivo_bytes=nf_arquivo.read(),
@@ -1147,7 +1197,7 @@ def renderizar_tab_financeiro() -> None:
     )
 
     datas_validas = df_fin["Data_dt"].dropna()
-    dt_min_padrao = datas_validas.min() if not datas_validas.empty else (date.today() - timedelta(days=30))
+    dt_min_padrao = datas_validas.min() if not datas_validas.empty else date.today()
     dt_max_padrao = datas_validas.max() if not datas_validas.empty else date.today()
     if dt_min_padrao > dt_max_padrao:
         dt_min_padrao = dt_max_padrao
@@ -1156,10 +1206,7 @@ def renderizar_tab_financeiro() -> None:
     categorias_opcoes = sorted(df_fin["Categoria"].astype(str).unique().tolist()) if not df_fin.empty else CATEGORIAS_FINANCEIRAS
     formas_opcoes = sorted(df_fin["Forma_Pagamento"].astype(str).unique().tolist()) if not df_fin.empty else FORMAS_PAGAMENTO
 
-    val_min_global = float(df_fin["Valor"].min()) if not df_fin.empty else 0.0
-    val_max_global = float(df_fin["Valor"].max()) if not df_fin.empty else 10000.0
-    if val_max_global <= val_min_global:
-        val_max_global = val_min_global + 1000.0
+    val_max_global = float(df_fin["Valor"].max()) if not df_fin.empty else 0.0
 
     f_col1, f_col2, f_col3, f_col4 = st.columns([1.4, 1.4, 1.5, 1.5])
     with f_col1:
@@ -1189,13 +1236,17 @@ def renderizar_tab_financeiro() -> None:
             placeholder="Todas as formas",
         )
 
-    faixa_valor = st.slider(
-        "Faixa de Valor do Lançamento (R$)",
-        min_value=0.0,
-        max_value=float(max(val_max_global, 100.0)),
-        value=(0.0, float(max(val_max_global, 100.0))),
-        step=10.0,
-    )
+    if val_max_global > 0.0:
+        faixa_valor = st.slider(
+            "Faixa de Valor do Lançamento (R$)",
+            min_value=0.0,
+            max_value=float(val_max_global),
+            value=(0.0, float(val_max_global)),
+            step=10.0,
+        )
+    else:
+        st.caption("Faixa de Valor do Lançamento: R$ 0,00 — R$ 0,00 (sem lançamentos registrados)")
+        faixa_valor = (0.0, 0.0)
     st.markdown("</div>", unsafe_allow_html=True)
 
     # Aplicação dos filtros sobre df_fin
@@ -1429,55 +1480,58 @@ def renderizar_tab_financeiro() -> None:
                 )
                 l_cat = st.selectbox("Categoria *", options=CATEGORIAS_FINANCEIRAS)
             with c_l3:
-                l_forn = st.text_input("Fornecedor / Cliente", placeholder="Ex: Mar & Cia Imports")
+                l_forn = st.text_input("Fornecedor / Cliente", placeholder="Informe o fornecedor ou origem")
                 l_forma = st.selectbox("Forma de Pagamento", options=FORMAS_PAGAMENTO)
             with c_l4:
-                l_valor = st.number_input("Valor (R$) *", min_value=0.01, value=100.0, step=10.0)
+                l_valor = st.number_input("Valor (R$) *", min_value=0.0, value=0.0, step=10.0)
                 l_subpasta = st.selectbox("Subpasta no Drive", options=["Notas_Fiscais", "Comprovantes"])
 
-            l_desc = st.text_input("Descrição Detalhada *", placeholder="Ex: NF 882 Compra de Salmão ou Fechamento Jantar")
+            l_desc = st.text_input("Descrição Detalhada *", placeholder="Informe a descrição do lançamento")
             l_arq = st.file_uploader(
                 "Anexar Nota Fiscal ou Comprovante (.pdf, .png, .jpg) — Upload automático para a pasta principal no Google Drive",
                 type=["pdf", "png", "jpg", "jpeg"],
             )
 
             if st.form_submit_button("Salvar Lançamento & Arquivar Documento"):
-                link_doc = "-"
-                if l_arq is not None:
-                    link_doc = db.upload_arquivo_drive(
-                        arquivo_bytes=l_arq.read(),
-                        nome_arquivo=l_arq.name,
-                        mime_type=l_arq.type or "application/octet-stream",
-                        subpasta=l_subpasta,
-                    )
-                    registrar_log(
-                        usuario=USUARIO_ATUAL,
-                        perfil=PERFIL_ATUAL,
-                        acao=f"Upload de arquivo '{l_arq.name}' para /{l_subpasta} no Google Drive",
-                        modulo="Financeiro",
-                    )
+                if l_valor <= 0.0:
+                    st.error("Informe um valor maior que R$ 0,00.")
+                else:
+                    link_doc = "-"
+                    if l_arq is not None:
+                        link_doc = db.upload_arquivo_drive(
+                            arquivo_bytes=l_arq.read(),
+                            nome_arquivo=l_arq.name,
+                            mime_type=l_arq.type or "application/octet-stream",
+                            subpasta=l_subpasta,
+                        )
+                        registrar_log(
+                            usuario=USUARIO_ATUAL,
+                            perfil=PERFIL_ATUAL,
+                            acao=f"Upload de arquivo '{l_arq.name}' para /{l_subpasta} no Google Drive",
+                            modulo="Financeiro",
+                        )
 
-                ok_l, id_gerado = db.registrar_lancamento_financeiro(
-                    data_lancamento=l_data.strftime("%Y-%m-%d"),
-                    tipo=l_tipo,
-                    natureza_custo=l_natureza,
-                    descricao=l_desc,
-                    categoria=l_cat,
-                    fornecedor=l_forn,
-                    forma_pagamento=l_forma,
-                    valor=l_valor,
-                    link_comprovante=link_doc,
-                    responsavel=USUARIO_ATUAL,
-                )
-                if ok_l:
-                    registrar_log(
-                        usuario=USUARIO_ATUAL,
-                        perfil=PERFIL_ATUAL,
-                        acao=f"Novo lançamento financeiro ({id_gerado}) - {l_tipo}: {formatar_moeda(l_valor)} ({l_cat})",
-                        modulo="Financeiro",
+                    ok_l, id_gerado = db.registrar_lancamento_financeiro(
+                        data_lancamento=l_data.strftime("%Y-%m-%d"),
+                        tipo=l_tipo,
+                        natureza_custo=l_natureza,
+                        descricao=l_desc,
+                        categoria=l_cat,
+                        fornecedor=l_forn,
+                        forma_pagamento=l_forma,
+                        valor=l_valor,
+                        link_comprovante=link_doc,
+                        responsavel=USUARIO_ATUAL,
                     )
-                    st.success(f"Lançamento {id_gerado} registrado com sucesso!")
-                    st.rerun()
+                    if ok_l:
+                        registrar_log(
+                            usuario=USUARIO_ATUAL,
+                            perfil=PERFIL_ATUAL,
+                            acao=f"Novo lançamento financeiro ({id_gerado}) - {l_tipo}: {formatar_moeda(l_valor)} ({l_cat})",
+                            modulo="Financeiro",
+                        )
+                        st.success(f"Lançamento {id_gerado} registrado com sucesso!")
+                        st.rerun()
 
     # 5. TABELA DETALHADA DE LANÇAMENTOS E NOTAS FISCAIS CADASTRADAS
     st.markdown("#### 📋 Lançamentos e Notas Fiscais Cadastradas")

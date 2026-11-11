@@ -118,7 +118,7 @@ FORMAS_PAGAMENTO = [
     "iFood / App Online",
 ]
 
-SESSION_DB_KEY = "mazon_unified_db_v5"
+SESSION_DB_KEY = "mazon_unified_db_v6"
 
 
 def calcular_status_estoque(qtd_atual: float, est_minimo: float, est_maximo: float = 0.0) -> str:
@@ -147,27 +147,14 @@ def calcular_status_estoque(qtd_atual: float, est_minimo: float, est_maximo: flo
 
 def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
     """
-    Inicializa as 4 abas da planilha unificada:
-    - Usuarios (4 perfis RBAC padrão)
-    - Logs_Auditoria
-    - Estoque (90 insumos oficiais do Restaurante Mazon)
-    - Financeiro (Estrutura pronta para filtros e DRE)
+    Inicializa as 4 abas da planilha unificada sem nenhum dado fictício (mock):
+    - Usuarios (4 perfis RBAC padrão obrigatórios)
+    - Logs_Auditoria (vazio — preenchido apenas por operações reais)
+    - Estoque (90 insumos oficiais do Restaurante Mazon com contagens e custos zerados em 0.0)
+    - Financeiro (vazio — preenchido apenas por lançamentos reais)
     """
     df_usuarios = pd.DataFrame(USUARIOS_PADRAO, columns=SHEETS_SCHEMA["Usuarios"])
-
-    agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    df_logs = pd.DataFrame(
-        [
-            (
-                agora_str,
-                "Sistema",
-                "Dev",
-                "Inicialização da estrutura unificada Mazon - Banco de Dados",
-                "Sistema",
-            )
-        ],
-        columns=SHEETS_SCHEMA["Logs_Auditoria"],
-    )
+    df_logs = pd.DataFrame(columns=SHEETS_SCHEMA["Logs_Auditoria"])
 
     catalogo_oficial = [
         # 1. Proteínas e Frutos do Mar (9 itens)
@@ -290,92 +277,7 @@ def _gerar_dados_iniciais() -> Dict[str, pd.DataFrame]:
         )
 
     df_estoque = pd.DataFrame(estoque_dicts, columns=SHEETS_SCHEMA["Estoque"])
-
-    hoje = datetime.now().strftime("%Y-%m-%d")
-    ontem = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    anteontem = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
-
-    lancamentos_iniciais = [
-        (
-            "FIN-001",
-            anteontem,
-            "Receita",
-            "Faturamento Bruto",
-            "Fechamento Salão Jantar",
-            "Faturamento Salão",
-            "Cliente Final (Salão)",
-            "Cartão de Crédito",
-            6850.00,
-            "-",
-            "Caixa",
-        ),
-        (
-            "FIN-002",
-            anteontem,
-            "Despesa",
-            "Custo Variável",
-            "Compra de Salmão e Atum Fresco",
-            "Insumos - Proteínas e Pescados",
-            "Mar & Cia Imports",
-            "Boleto Faturado",
-            2840.00,
-            "https://drive.google.com/drive/folders/mazon-notas-fiscais",
-            "Claudio",
-        ),
-        (
-            "FIN-003",
-            ontem,
-            "Receita",
-            "Faturamento Bruto",
-            "Vendas Delivery Turno Noite",
-            "Faturamento Delivery (iFood / Próprio)",
-            "iFood / Delivery",
-            "PIX",
-            5420.00,
-            "-",
-            "Caixa",
-        ),
-        (
-            "FIN-004",
-            ontem,
-            "Despesa",
-            "Custo Variável",
-            "Reposição Embalagens H01/H02/Kraft",
-            "Insumos - Embalagens e Descartáveis",
-            "PackLux Embalagens",
-            "PIX",
-            980.00,
-            "https://drive.google.com/drive/folders/mazon-notas-fiscais",
-            "Claudio",
-        ),
-        (
-            "FIN-005",
-            hoje,
-            "Receita",
-            "Faturamento Bruto",
-            "Fechamento Parcial Caixa Dia",
-            "Faturamento Salão",
-            "Cliente Final (Salão)",
-            "PIX",
-            4910.00,
-            "-",
-            "Caixa",
-        ),
-        (
-            "FIN-006",
-            hoje,
-            "Despesa",
-            "Custo Fixo",
-            "Energia Elétrica e Gás Industrial",
-            "Aluguel, Energia, Água e Gás",
-            "Concessionária / Ultragaz",
-            "Boleto Faturado",
-            1650.00,
-            "https://drive.google.com/drive/folders/mazon-comprovantes",
-            "Arthur",
-        ),
-    ]
-    df_financeiro = pd.DataFrame(lancamentos_iniciais, columns=SHEETS_SCHEMA["Financeiro"])
+    df_financeiro = pd.DataFrame(columns=SHEETS_SCHEMA["Financeiro"])
 
     return {
         "Usuarios": df_usuarios,
@@ -417,25 +319,39 @@ class MazonSheetsManager:
             st.session_state[SESSION_DB_KEY] = _gerar_dados_iniciais()
 
     def _try_connect_cloud(self) -> None:
-        """Autentica no Google Cloud e abre/cria a planilha única 'Mazon - Banco de Dados'."""
+        """
+        Autentica no Google Cloud verificando PRIMEIRO st.secrets (para Streamlit Cloud)
+        e DEPOIS o arquivo de credenciais local (credentials.json).
+        """
         creds: Optional[Credentials] = None
 
+        # 1. Prioridade: st.secrets (Streamlit Cloud)
         try:
-            if os.path.exists(self.credentials_path):
-                creds = Credentials.from_service_account_file(
-                    self.credentials_path, scopes=SCOPES
-                )
-            elif "gcp_service_account" in st.secrets:
+            if "gcp_service_account" in st.secrets:
                 creds = Credentials.from_service_account_info(
                     dict(st.secrets["gcp_service_account"]), scopes=SCOPES
                 )
-        except Exception as exc:
-            self.connection_message = f"Modo Local Ativo ({exc})"
-            self.connected = False
-            return
+            elif "type" in st.secrets and "private_key" in st.secrets:
+                creds = Credentials.from_service_account_info(
+                    dict(st.secrets), scopes=SCOPES
+                )
+        except Exception:
+            creds = None
+
+        # 2. Fallback: Arquivo de credenciais local (credentials.json)
+        if creds is None:
+            try:
+                if os.path.exists(self.credentials_path):
+                    creds = Credentials.from_service_account_file(
+                        self.credentials_path, scopes=SCOPES
+                    )
+            except Exception as exc:
+                self.connection_message = f"Modo Local Ativo ({exc})"
+                self.connected = False
+                return
 
         if creds is None:
-            self.connection_message = "Banco Unificado em Memória Ativo (Offline/Demo)"
+            self.connection_message = "Banco Unificado em Memória Ativo (Offline)"
             self.connected = False
             return
 
@@ -455,8 +371,8 @@ class MazonSheetsManager:
                     except Exception:
                         self.spreadsheet = self.client.create(self.spreadsheet_name)
 
-            self._garantir_abas_obrigatorias()
             self.connected = True
+            self._garantir_abas_obrigatorias()
             self.connection_message = f"Planilha Unificada Online: {self.spreadsheet.title}"
         except Exception as exc:
             self.connected = False
@@ -466,7 +382,8 @@ class MazonSheetsManager:
         """
         Verifica e inicializa automaticamente as 4 abas obrigatórias:
         Usuarios, Logs_Auditoria, Estoque e Financeiro.
-        Garante também que os 4 usuários padrão existam na aba Usuarios.
+        Garante também que os 4 usuários padrão existam na aba Usuarios
+        e remove eventuais lançamentos fictícios de versões anteriores.
         """
         if not self.spreadsheet:
             return
@@ -509,6 +426,23 @@ class MazonSheetsManager:
             if novos_u:
                 df_u = pd.concat([df_u, pd.DataFrame(novos_u)], ignore_index=True)
                 self.salvar_aba("Usuarios", df_u)
+        except Exception:
+            pass
+
+        # Limpa automaticamente lançamentos fictícios (mock) caso tenham sido gravados antes
+        try:
+            descricoes_ficticias = {
+                "Fechamento Salão Jantar",
+                "Compra de Salmão e Atum Fresco",
+                "Vendas Delivery Turno Noite",
+                "Reposição Embalagens H01/H02/Kraft",
+                "Fechamento Parcial Caixa Dia",
+                "Energia Elétrica e Gás Industrial",
+            }
+            df_f = self.ler_aba("Financeiro")
+            if not df_f.empty and df_f["Descricao"].astype(str).isin(descricoes_ficticias).any():
+                df_f_limpo = df_f[~df_f["Descricao"].astype(str).isin(descricoes_ficticias)].copy()
+                self.salvar_aba("Financeiro", df_f_limpo)
         except Exception:
             pass
 
