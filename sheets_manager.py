@@ -17,12 +17,25 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-import gspread
 import pandas as pd
 import streamlit as st
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+
+try:
+    import gspread
+except ImportError:
+    gspread = None  # type: ignore
+
+try:
+    from google.oauth2.service_account import Credentials
+except ImportError:
+    Credentials = None  # type: ignore
+
+try:
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseUpload
+except ImportError:
+    build = None  # type: ignore
+    MediaIoBaseUpload = None  # type: ignore
 
 # Escopos exigidos para Google Sheets e Google Drive
 SCOPES = [
@@ -341,36 +354,44 @@ class MazonSheetsManager:
         """
         Autentica no Google Cloud verificando PRIMEIRO st.secrets (para Streamlit Cloud)
         e DEPOIS o arquivo de credenciais local (credentials.json).
+        Trata de forma segura credenciais nulas, vazias ou ausentes no Streamlit Cloud.
         """
-        creds: Optional[Credentials] = None
+        if Credentials is None or gspread is None or build is None:
+            self.connection_message = "Bibliotecas Google Cloud indisponíveis (Operando em Memória)"
+            self.connected = False
+            return
 
-        # 1. Prioridade: st.secrets (Streamlit Cloud)
+        creds: Optional[Any] = None
+
+        # 1. Prioridade: st.secrets (Streamlit Cloud) — trata secrets vazios/nulos sem quebrar
         try:
-            if "gcp_service_account" in st.secrets:
-                creds = Credentials.from_service_account_info(
-                    dict(st.secrets["gcp_service_account"]), scopes=SCOPES
-                )
-            elif "type" in st.secrets and "private_key" in st.secrets:
-                creds = Credentials.from_service_account_info(
-                    dict(st.secrets), scopes=SCOPES
-                )
-        except Exception:
+            if hasattr(st, "secrets") and st.secrets is not None:
+                secrets_dict = dict(st.secrets)
+                if secrets_dict.get("gcp_service_account"):
+                    sa_raw = secrets_dict["gcp_service_account"]
+                    if sa_raw:
+                        sa_info = dict(sa_raw)
+                        if sa_info.get("private_key") and sa_info.get("client_email"):
+                            creds = Credentials.from_service_account_info(sa_info, scopes=SCOPES)
+                elif secrets_dict.get("private_key") and secrets_dict.get("client_email"):
+                    creds = Credentials.from_service_account_info(secrets_dict, scopes=SCOPES)
+        except BaseException:
             creds = None
 
         # 2. Fallback: Arquivo de credenciais local (credentials.json)
         if creds is None:
             try:
-                if os.path.exists(self.credentials_path):
+                if self.credentials_path and os.path.exists(self.credentials_path):
                     creds = Credentials.from_service_account_file(
                         self.credentials_path, scopes=SCOPES
                     )
-            except Exception as exc:
+            except BaseException as exc:
                 self.connection_message = f"Modo Local Ativo ({exc})"
                 self.connected = False
                 return
 
         if creds is None:
-            self.connection_message = "Banco Unificado em Memória Ativo (Offline)"
+            self.connection_message = "Banco Unificado em Memória Ativo (Credenciais Cloud não preenchidas)"
             self.connected = False
             return
 
@@ -383,7 +404,7 @@ class MazonSheetsManager:
             else:
                 try:
                     self.spreadsheet = self.client.open(self.spreadsheet_name)
-                except gspread.SpreadsheetNotFound:
+                except Exception:
                     try:
                         # Tenta abrir a planilha anterior caso o usuário já a tenha compartilhado
                         self.spreadsheet = self.client.open("Restaurante_Mazon_ERP_Database")
@@ -393,7 +414,7 @@ class MazonSheetsManager:
             self.connected = True
             self._garantir_abas_obrigatorias()
             self.connection_message = f"Planilha Unificada Online: {self.spreadsheet.title}"
-        except Exception as exc:
+        except BaseException as exc:
             self.connected = False
             self.connection_message = f"Operando em Cache Seguro (Aviso Cloud: {exc})"
 
@@ -934,3 +955,8 @@ def registrar_log(usuario: str, perfil: str, acao: str, modulo: str) -> bool:
         db_instance = MazonSheetsManager()
         st.session_state["_mazon_db_instance"] = db_instance
     return db_instance.registrar_log(usuario=usuario, perfil=perfil, acao=acao, modulo=modulo)
+
+
+# Alias de compatibilidade para importações legadas ou externas
+SheetsManager = MazonSheetsManager
+
