@@ -30,6 +30,24 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
+# Permissões Granulares por Módulo
+PERMISSOES_DISPONIVEIS: Dict[str, str] = {
+    "home": "🏠 Home — Painel Executivo e Alertas Críticos",
+    "estoque_leitura": "📦 Estoque — Dashboard, Tabela, Movimentação, Comparativo, OCR e Compras",
+    "estoque_edicao": "📦 Estoque — Cadastrar e Editar Parâmetros de Insumos",
+    "fin_lancamentos": "💰 Financeiro — Lançamentos Diários e Upload de NFs/Comprovantes",
+    "fin_relatorios": "💰 Financeiro — Faturamento, DRE, CMV, Break-Even e Relatório Descritivo",
+    "auditoria_logs": "🛡️ Auditoria — Visualização de Logs de Operações",
+    "usuarios_gestao": "🛡️ Usuários — Gestão de Acessos, Cargos e Permissões",
+}
+
+PERMISSOES_POR_PERFIL: Dict[str, List[str]] = {
+    "Dev": list(PERMISSOES_DISPONIVEIS.keys()),
+    "Gerente": list(PERMISSOES_DISPONIVEIS.keys()),
+    "Caixa": ["home", "estoque_leitura", "fin_lancamentos"],
+    "Equipe": ["home", "estoque_leitura"],
+}
+
 # Esquema Unificado das 4 Abas Principais na Planilha Única "Mazon - Banco de Dados"
 SHEETS_SCHEMA: Dict[str, List[str]] = {
     "Usuarios": [
@@ -38,6 +56,7 @@ SHEETS_SCHEMA: Dict[str, List[str]] = {
         "Senha",
         "Data_Cadastro",
         "Ativo",
+        "Permissoes",
     ],
     "Logs_Auditoria": [
         "Data_Hora",
@@ -76,10 +95,10 @@ SHEETS_SCHEMA: Dict[str, List[str]] = {
 
 # Usuários Padrão Obrigatórios (RBAC)
 USUARIOS_PADRAO = [
-    ("Arthur", "Dev", "245716", "2026-11-01", "Sim"),
-    ("Claudio", "Gerente", "221016", "2026-11-01", "Sim"),
-    ("Caixa", "Caixa", "mazon123", "2026-11-01", "Sim"),
-    ("Equipe", "Equipe", "1234", "2026-11-01", "Sim"),
+    ("Arthur", "Dev", "245716", "2026-11-01", "Sim", ",".join(PERMISSOES_POR_PERFIL["Dev"])),
+    ("Claudio", "Gerente", "221016", "2026-11-01", "Sim", ",".join(PERMISSOES_POR_PERFIL["Gerente"])),
+    ("Caixa", "Caixa", "mazon123", "2026-11-01", "Sim", ",".join(PERMISSOES_POR_PERFIL["Caixa"])),
+    ("Equipe", "Equipe", "1234", "2026-11-01", "Sim", ",".join(PERMISSOES_POR_PERFIL["Equipe"])),
 ]
 
 # Categorias Oficiais de Estoque do Restaurante Mazon
@@ -412,7 +431,7 @@ class MazonSheetsManager:
             df_u = self.ler_aba("Usuarios")
             usuarios_atuais = set(df_u["Usuario"].astype(str).str.strip().tolist())
             novos_u = []
-            for u_nome, u_perf, u_senha, u_data, u_ativo in USUARIOS_PADRAO:
+            for u_nome, u_perf, u_senha, u_data, u_ativo, u_perms in USUARIOS_PADRAO:
                 if u_nome not in usuarios_atuais:
                     novos_u.append(
                         {
@@ -421,6 +440,7 @@ class MazonSheetsManager:
                             "Senha": u_senha,
                             "Data_Cadastro": u_data,
                             "Ativo": u_ativo,
+                            "Permissoes": u_perms,
                         }
                     )
             if novos_u:
@@ -445,6 +465,16 @@ class MazonSheetsManager:
                 self.salvar_aba("Financeiro", df_f_limpo)
         except Exception:
             pass
+
+    @staticmethod
+    def resolver_permissoes(perfil: str, permissoes_str: str = "") -> List[str]:
+        """Resolve a lista de permissões ativas de um usuário com fallback para o perfil padrão."""
+        p_limpo = str(permissoes_str or "").strip()
+        if p_limpo and p_limpo != "-":
+            lista = [p.strip() for p in p_limpo.split(",") if p.strip() in PERMISSOES_DISPONIVEIS]
+            if lista:
+                return lista
+        return list(PERMISSOES_POR_PERFIL.get(perfil, ["home", "estoque_leitura"]))
 
     def ler_aba(self, nome_aba: str) -> pd.DataFrame:
         """Lê qualquer aba da planilha unificada com fallback automático em sessão."""
@@ -491,10 +521,10 @@ class MazonSheetsManager:
         return True
 
     # ==========================================================================
-    # AUTENTICAÇÃO E GESTÃO DE USUÁRIOS (ABA 'Usuarios')
+    # AUTENTICAÇÃO, HIERARQUIA E GESTÃO DE USUÁRIOS (ABA 'Usuarios')
     # ==========================================================================
-    def autenticar_usuario(self, usuario: str, senha: str) -> Optional[Dict[str, str]]:
-        """Valida credenciais na aba 'Usuarios' e retorna dicionário {usuario, perfil} se válido."""
+    def autenticar_usuario(self, usuario: str, senha: str) -> Optional[Dict[str, Any]]:
+        """Valida credenciais na aba 'Usuarios' e retorna {usuario, perfil, permissoes} se válido."""
         df_usuarios = self.ler_aba("Usuarios")
         u_limpo = usuario.strip().lower()
         s_limpa = str(senha).strip()
@@ -506,31 +536,91 @@ class MazonSheetsManager:
                 str(row["Usuario"]).strip().lower() == u_limpo
                 and str(row["Senha"]).strip() == s_limpa
             ):
+                perf = str(row["Perfil"]).strip()
+                perms = self.resolver_permissoes(perf, str(row.get("Permissoes", "")))
                 return {
                     "usuario": str(row["Usuario"]).strip(),
-                    "perfil": str(row["Perfil"]).strip(),
+                    "perfil": perf,
+                    "permissoes": perms,
                 }
         return None
 
+    def listar_usuarios_visiveis(self, perfil_logado: str) -> pd.DataFrame:
+        """
+        Retorna os usuários visíveis respeitando a hierarquia:
+        - Dev: visualiza 100% dos usuários (incluindo contas Dev).
+        - Gerente: visualiza até o nível Gerente (NÃO visualiza contas Dev).
+        """
+        df_u = self.ler_aba("Usuarios").copy()
+        if df_u.empty:
+            return df_u
+        for idx, row in df_u.iterrows():
+            perms_atuais = self.resolver_permissoes(
+                str(row.get("Perfil", "Equipe")), str(row.get("Permissoes", ""))
+            )
+            df_u.at[idx, "Permissoes"] = ",".join(perms_atuais)
+        if str(perfil_logado).strip() != "Dev":
+            df_u = df_u[df_u["Perfil"].astype(str).str.strip() != "Dev"].copy()
+        return df_u
+
     def cadastrar_ou_atualizar_usuario(
-        self, novo_usuario: str, perfil: str, senha: str, ativo: str = "Sim"
+        self,
+        novo_usuario: str,
+        perfil: str,
+        senha: str,
+        ativo: str = "Sim",
+        permissoes_lista: Optional[List[str]] = None,
+        operador_perfil: str = "Dev",
     ) -> Tuple[bool, str]:
-        """Cadastra ou atualiza um usuário na aba 'Usuarios' (Exclusivo para perfil Dev)."""
+        """
+        Cadastra ou atualiza um usuário na aba 'Usuarios' respeitando a hierarquia:
+        - Apenas o perfil Dev pode criar, visualizar ou promover contas para o nível Dev.
+        - O perfil Gerente pode criar e gerenciar contas até o nível Gerente, sem alterar contas Dev.
+        """
         df_u = self.ler_aba("Usuarios")
         nome_limpo = novo_usuario.strip()
-        if not nome_limpo or not str(senha).strip():
-            return False, "Preencha usuário e senha."
+        if not nome_limpo:
+            return False, "Informe o nome do usuário."
+
+        # Regra de Hierarquia: Somente Dev pode atribuir ou editar perfil Dev
+        if str(operador_perfil).strip() != "Dev" and str(perfil).strip() == "Dev":
+            return (
+                False,
+                "Acesso negado pela hierarquia: Apenas o perfil Dev (Arthur) pode criar ou promover usuários para o nível Dev.",
+            )
+
+        mascara = df_u["Usuario"].astype(str).str.lower() == nome_limpo.lower()
+        if mascara.any():
+            idx = df_u[mascara].index[0]
+            perfil_existente = str(df_u.loc[idx, "Perfil"]).strip()
+            if str(operador_perfil).strip() != "Dev" and perfil_existente == "Dev":
+                return (
+                    False,
+                    "Acesso negado pela hierarquia: O perfil Gerente não pode alterar usuários de nível Dev.",
+                )
+
+        perms_finais = (
+            [p for p in permissoes_lista if p in PERMISSOES_DISPONIVEIS]
+            if permissoes_lista is not None
+            else list(PERMISSOES_POR_PERFIL.get(perfil, ["home", "estoque_leitura"]))
+        )
+        if not perms_finais:
+            perms_finais = ["home"]
+        perms_str = ",".join(perms_finais)
 
         hoje = datetime.now().strftime("%Y-%m-%d")
-        mascara = df_u["Usuario"].astype(str).str.lower() == nome_limpo.lower()
 
         if mascara.any():
             idx = df_u[mascara].index[0]
             df_u.loc[idx, "Perfil"] = perfil
-            df_u.loc[idx, "Senha"] = str(senha).strip()
+            if str(senha).strip():
+                df_u.loc[idx, "Senha"] = str(senha).strip()
             df_u.loc[idx, "Ativo"] = ativo
-            msg = f"Usuário '{nome_limpo}' atualizado para o perfil '{perfil}'."
+            df_u.loc[idx, "Permissoes"] = perms_str
+            msg = f"Usuário '{nome_limpo}' atualizado com sucesso (Perfil: {perfil} | Status: {ativo})."
         else:
+            if not str(senha).strip():
+                return False, "Informe uma senha para o novo usuário."
             nova_linha = pd.DataFrame(
                 [
                     {
@@ -539,6 +629,7 @@ class MazonSheetsManager:
                         "Senha": str(senha).strip(),
                         "Data_Cadastro": hoje,
                         "Ativo": ativo,
+                        "Permissoes": perms_str,
                     }
                 ]
             )
