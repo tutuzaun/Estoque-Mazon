@@ -103,7 +103,7 @@ def obter_caminho_logo() -> Optional[str]:
 
 
 def carregar_estilos_css(caminho_css: str = "style.css") -> None:
-    """Injeta a folha de estilos Luxury Minimalist UI (Creme #F4EDE3 & Azul Marinho #0B1B2B)."""
+    """Injeta a folha de estilos Luxury Minimalist UI (Creme #F6F2EA & Azul Marinho #0B192C)."""
     if os.path.exists(caminho_css):
         with open(caminho_css, "r", encoding="utf-8") as f:
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -163,9 +163,9 @@ def _decorar_pagina_pdf(canvas: Any, doc: Any) -> None:
     largura, altura = doc.pagesize
 
     # Faixa superior Azul Marinho e filete Dourado
-    canvas.setFillColor(colors.HexColor("#0B1B2B"))
+    canvas.setFillColor(colors.HexColor("#0B192C"))
     canvas.rect(0, altura - 10 * mm, largura, 10 * mm, fill=1, stroke=0)
-    canvas.setFillColor(colors.HexColor("#D4A24C"))
+    canvas.setFillColor(colors.HexColor("#B89758"))
     canvas.rect(0, altura - 11.2 * mm, largura, 1.2 * mm, fill=1, stroke=0)
 
     # Rodapé com numeração e assinatura do sistema
@@ -218,7 +218,7 @@ def gerar_pdf_tabela_analitica(
         fontSize=14,
         leading=18,
         alignment=1,
-        textColor=colors.HexColor("#0B1B2B"),
+        textColor=colors.HexColor("#0B192C"),
         spaceAfter=4,
     )
     estilo_sub = ParagraphStyle(
@@ -237,7 +237,7 @@ def gerar_pdf_tabela_analitica(
         fontName="Helvetica",
         fontSize=7.5,
         leading=9.5,
-        textColor=colors.HexColor("#0B1B2B"),
+        textColor=colors.HexColor("#0B192C"),
     )
     estilo_cabecalho = ParagraphStyle(
         "MazonCabecalho",
@@ -245,7 +245,7 @@ def gerar_pdf_tabela_analitica(
         fontName="Helvetica-Bold",
         fontSize=7.8,
         leading=10,
-        textColor=colors.HexColor("#F4EDE3"),
+        textColor=colors.HexColor("#F6F2EA"),
     )
 
     elementos: List[Any] = []
@@ -294,11 +294,11 @@ def gerar_pdf_tabela_analitica(
         tabela.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B1B2B")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#F4EDE3")),
-                    ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor("#D4A24C")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B192C")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#F6F2EA")),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor("#B89758")),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F4EDE3")]),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F6F2EA")]),
                     ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E5DCD0")),
                     ("TOPPADDING", (0, 0), (-1, -1), 5),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -342,7 +342,7 @@ def gerar_pdf_relatorio_resumido(
         fontSize=15,
         leading=19,
         alignment=1,
-        textColor=colors.HexColor("#0B1B2B"),
+        textColor=colors.HexColor("#0B192C"),
         spaceAfter=4,
     )
     estilo_sub = ParagraphStyle(
@@ -361,7 +361,7 @@ def gerar_pdf_relatorio_resumido(
         fontName="Helvetica-Bold",
         fontSize=11,
         leading=15,
-        textColor=colors.HexColor("#0B1B2B"),
+        textColor=colors.HexColor("#0B192C"),
         spaceBefore=10,
         spaceAfter=6,
     )
@@ -371,7 +371,7 @@ def gerar_pdf_relatorio_resumido(
         fontName="Helvetica",
         fontSize=9.2,
         leading=13.5,
-        textColor=colors.HexColor("#0B1B2B"),
+        textColor=colors.HexColor("#0B192C"),
         spaceAfter=6,
     )
 
@@ -406,17 +406,17 @@ def gerar_pdf_relatorio_resumido(
         tab_kpi.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B1B2B")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#F4EDE3")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B192C")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#F6F2EA")),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, 0), 9),
-                    ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor("#D4A24C")),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor("#B89758")),
                     ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
                     ("FONTNAME", (1, 1), (1, -1), "Helvetica-Bold"),
                     ("TEXTCOLOR", (1, 1), (1, -1), colors.HexColor("#9A6B1F")),
                     ("FONTNAME", (2, 1), (2, -1), "Helvetica"),
                     ("FONTSIZE", (0, 1), (-1, -1), 8.8),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F4EDE3")]),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F6F2EA")]),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E5DCD0")),
                     ("TOPPADDING", (0, 0), (-1, -1), 6),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
@@ -452,11 +452,11 @@ def gerar_pdf_relatorio_resumido(
         t_res.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B1B2B")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#F4EDE3")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B192C")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#F6F2EA")),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F4EDE3")]),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F6F2EA")]),
                     ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E5DCD0")),
                     ("TOPPADDING", (0, 0), (-1, -1), 5),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -540,8 +540,9 @@ def renderizar_tela_login() -> None:
 
         st.markdown(
             '<div class="mazon-login-box">'
-            '<h2 style="margin:0 0 4px 0; color:#0B1B2B; font-size:1.45rem;">Acesso Restrito — Restaurante Mazon</h2>'
-            '<p style="color:#687787; font-size:0.86rem; margin-bottom:0;">Insira suas credenciais para acessar o Sistema Unificado de Estoque &amp; Inteligência Financeira</p>'
+            '<div class="mazon-login-badge">Sistema Executivo Interno</div>'
+            '<h2 style="margin:0 0 6px 0; color:#0B192C; font-size:1.55rem;">Acesso Restrito — Restaurante Mazon</h2>'
+            '<p style="color:#475569; font-size:0.88rem; margin-bottom:0;">Insira suas credenciais para acessar o Sistema Unificado de Estoque &amp; Inteligência Financeira</p>'
             "</div>",
             unsafe_allow_html=True,
         )
@@ -610,8 +611,8 @@ if caminho_logo_sb:
 else:
     st.sidebar.markdown(
         '<div style="text-align: center; padding: 10px 0 16px 0;">'
-        '<div style="font-family: \'Poppins\', sans-serif; font-size: 1.5rem; font-weight: 600; color: #F4EDE3; letter-spacing: 2px;">MAZON</div>'
-        '<div style="font-size: 0.72rem; color: #D4A24C; text-transform: uppercase; letter-spacing: 1.4px; margin-top: 2px;">Restaurante Japonês</div>'
+        '<div style="font-family: \'Poppins\', sans-serif; font-size: 1.5rem; font-weight: 600; color: #F6F2EA; letter-spacing: 2px;">MAZON</div>'
+        '<div style="font-size: 0.72rem; color: #B89758; text-transform: uppercase; letter-spacing: 1.4px; margin-top: 2px;">Restaurante Japonês</div>'
         "</div>",
         unsafe_allow_html=True,
     )
@@ -649,15 +650,15 @@ with st.sidebar:
     # Cartão de Identificação do Perfil Logado (Presente em todas as abas)
     st.markdown(
         f'<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(212,162,76,0.35); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;">'
-        f'<div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #D4A24C;">Sessão Ativa · Perfil {PERFIL_ATUAL}</div>'
-        f'<div style="font-size: 1.02rem; font-weight: 600; color: #F4EDE3; margin-top: 2px;">👤 {USUARIO_ATUAL}</div>'
+        f'<div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #B89758;">Sessão Ativa · Perfil {PERFIL_ATUAL}</div>'
+        f'<div style="font-size: 1.02rem; font-weight: 600; color: #F6F2EA; margin-top: 2px;">👤 {USUARIO_ATUAL}</div>'
         "</div>",
         unsafe_allow_html=True,
     )
 
     # Contexto 1: Tab Home -> Exibe apenas dados do perfil logado e botão Sair
     if ABA_SUPERIOR_ATIVA == "🏠 Home":
-        cor_status_nuvem = "#1F9D55" if db.connected else "#D4A24C"
+        cor_status_nuvem = "#15803D" if db.connected else "#B89758"
         titulo_nuvem = "Mazon - Banco de Dados Online" if db.connected else "Banco Unificado Ativo"
         st.markdown(
             f'<div style="padding: 8px 12px; margin-bottom: 12px; border-left: 2px solid {cor_status_nuvem};">'
@@ -670,7 +671,7 @@ with st.sidebar:
     # Contexto 2: Tab Estoque -> Exibe as 5 sub-páginas exclusivas de Estoque
     elif ABA_SUPERIOR_ATIVA == "📦 Estoque":
         st.markdown(
-            '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#D4A24C; font-weight:600; margin: 6px 0 6px 4px;">📦 Sub-páginas de Estoque</p>',
+            '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#B89758; font-weight:600; margin: 6px 0 6px 4px;">📦 Sub-páginas de Estoque</p>',
             unsafe_allow_html=True,
         )
         SUBPAGINA_ESTOQUE = st.radio(
@@ -689,7 +690,7 @@ with st.sidebar:
     # Contexto 3: Tab Gestão Financeira -> Exibe as 6 sub-páginas (ou apenas Lançamentos e NFs para Caixa)
     elif ABA_SUPERIOR_ATIVA == "💰 Gestão Financeira":
         st.markdown(
-            '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#D4A24C; font-weight:600; margin: 6px 0 6px 4px;">💰 Sub-páginas Financeiras</p>',
+            '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#B89758; font-weight:600; margin: 6px 0 6px 4px;">💰 Sub-páginas Financeiras</p>',
             unsafe_allow_html=True,
         )
         if PERFIL_ATUAL == "Caixa" and not tem_permissao("fin_relatorios"):
@@ -713,7 +714,7 @@ with st.sidebar:
     # Contexto 4: Tab Gestão de Usuários & Auditoria -> Exibe as 2 sub-páginas
     elif ABA_SUPERIOR_ATIVA == "🛡️ Gestão de Usuários & Auditoria":
         st.markdown(
-            '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#D4A24C; font-weight:600; margin: 6px 0 6px 4px;">🛡️ Segurança &amp; Governança</p>',
+            '<p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.4px; color:#B89758; font-weight:600; margin: 6px 0 6px 4px;">🛡️ Segurança &amp; Governança</p>',
             unsafe_allow_html=True,
         )
         opcoes_aud_sb = []
@@ -771,7 +772,7 @@ def renderizar_modulo_home() -> None:
     with col_h_tit:
         st.markdown(
             f'<div style="margin-bottom: 14px;">'
-            f'<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">🏠 Home — Visão Executiva &amp; Alertas Críticos</h1>'
+            f'<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">🏠 Home — Visão Executiva &amp; Alertas Críticos</h1>'
             f'<p style="color:#687787; font-size:0.9rem; margin:0;">Bem-vindo, <strong>{USUARIO_ATUAL}</strong> ({PERFIL_ATUAL}) · Síntese operacional de {datetime.now().strftime("%d/%m/%Y")}</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -818,7 +819,7 @@ def renderizar_modulo_home() -> None:
                 unsafe_allow_html=True,
             )
         with c2:
-            cor_saldo = "#1F9D55" if saldo_liquido >= 0 else "#D9383A"
+            cor_saldo = "#15803D" if saldo_liquido >= 0 else "#B91C1C"
             st.markdown(
                 '<div class="mazon-kpi-card">'
                 '<div class="mazon-kpi-label">Resultado Líquido Acumulado</div>'
@@ -831,7 +832,7 @@ def renderizar_modulo_home() -> None:
             st.markdown(
                 '<div class="mazon-kpi-card">'
                 '<div class="mazon-kpi-label">Insumos em Alerta Crítico</div>'
-                f'<div class="mazon-kpi-value" style="color:#D9383A;">{len(df_criticos)}</div>'
+                f'<div class="mazon-kpi-value" style="color:#B91C1C;">{len(df_criticos)}</div>'
                 f'<div class="mazon-kpi-sub">Contagens ativas em estoque: {itens_contados}</div>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -852,7 +853,7 @@ def renderizar_modulo_home() -> None:
         with col_g1:
             st.markdown(
                 '<div class="mazon-card" style="margin-bottom: 8px; padding: 1.15rem 1.4rem 0.4rem 1.4rem;">'
-                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Evolução Recente: Receitas vs. Despesas (R$)</h4>'
+                '<h4 style="margin:0; color:#0B192C; font-size:0.98rem;">Evolução Recente: Receitas vs. Despesas (R$)</h4>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -864,14 +865,14 @@ def renderizar_modulo_home() -> None:
                     y="Valor",
                     color="Tipo",
                     barmode="group",
-                    color_discrete_map={"Receita": "#0B1B2B", "Despesa": "#D4A24C"},
+                    color_discrete_map={"Receita": "#0B192C", "Despesa": "#B89758"},
                 )
                 fig_home.update_layout(
-                    paper_bgcolor="#FFFFFF",
-                    plot_bgcolor="#FFFFFF",
-                    font=dict(color="#0B1B2B", family="Poppins"),
-                    xaxis=dict(title="Data", gridcolor="#EBE4D8"),
-                    yaxis=dict(title="Valor (R$)", gridcolor="#EBE4D8"),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#0B192C", family="Plus Jakarta Sans, sans-serif"),
+                    xaxis=dict(title="Data", gridcolor="rgba(11, 25, 44, 0.08)"),
+                    yaxis=dict(title="Valor (R$)", gridcolor="rgba(11, 25, 44, 0.08)"),
                     margin=dict(l=12, r=12, t=15, b=15),
                     height=320,
                 )
@@ -882,7 +883,7 @@ def renderizar_modulo_home() -> None:
         with col_g2:
             st.markdown(
                 '<div class="mazon-card" style="margin-bottom: 8px; padding: 1.15rem 1.4rem 0.4rem 1.4rem;">'
-                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Saldo Físico Contado por Categoria</h4>'
+                '<h4 style="margin:0; color:#0B192C; font-size:0.98rem;">Saldo Físico Contado por Categoria</h4>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -898,13 +899,13 @@ def renderizar_modulo_home() -> None:
                     names="Categoria",
                     values="Saldo_Total",
                     hole=0.6,
-                    color_discrete_sequence=["#0B1B2B", "#D4A24C", "#1C354D", "#C59237", "#34506B", "#E0B86B"],
+                    color_discrete_sequence=["#0B192C", "#B89758", "#15803D", "#475569", "#856830", "#64748B"],
                 )
-                fig_pie.update_traces(textinfo="percent+label", textfont_color="#0B1B2B")
+                fig_pie.update_traces(textinfo="percent+label", textfont_color="#0B192C")
                 fig_pie.update_layout(
-                    paper_bgcolor="#FFFFFF",
-                    plot_bgcolor="#FFFFFF",
-                    font=dict(color="#0B1B2B", family="Poppins"),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#0B192C", family="Plus Jakarta Sans, sans-serif"),
                     showlegend=False,
                     margin=dict(l=10, r=10, t=10, b=10),
                     height=320,
@@ -955,7 +956,7 @@ def renderizar_modulo_home() -> None:
             st.markdown(
                 '<div class="mazon-kpi-card">'
                 '<div class="mazon-kpi-label">Insumos em Alerta Crítico</div>'
-                f'<div class="mazon-kpi-value" style="color:#D9383A;">{len(df_criticos)}</div>'
+                f'<div class="mazon-kpi-value" style="color:#B91C1C;">{len(df_criticos)}</div>'
                 '<div class="mazon-kpi-sub">Itens abaixo do estoque mínimo definido</div>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -987,12 +988,12 @@ def renderizar_modulo_home() -> None:
             pills_list.append(
                 '<div class="critical-item-pill">'
                 '<div style="display:flex; justify-content:space-between; align-items:center;">'
-                f'<span style="font-weight:600; color:#0B1B2B; font-size:0.88rem;">{row["Item"]}</span>'
+                f'<span style="font-weight:600; color:#0B192C; font-size:0.88rem;">{row["Item"]}</span>'
                 f"{badge_card}"
                 "</div>"
                 f'<div style="font-size:0.74rem; color:#9A6B1F; margin-top:3px;">{row["Categoria"]} · {row["ID"]}</div>'
-                '<div style="font-size:0.8rem; color:#0B1B2B; margin-top:5px;">'
-                f'Atual: <strong style="color:#D9383A;">{float(row["Qtd_Atual"]):.1f} {row["Unidade"]}</strong>'
+                '<div style="font-size:0.8rem; color:#0B192C; margin-top:5px;">'
+                f'Atual: <strong style="color:#B91C1C;">{float(row["Qtd_Atual"]):.1f} {row["Unidade"]}</strong>'
                 f' &nbsp;/&nbsp; Mín: <strong>{float(row["Est_Minimo"]):.1f} {row["Unidade"]}</strong>'
                 f" &nbsp;(Déficit: -{deficit:.1f} {row['Unidade']})"
                 "</div>"
@@ -1031,7 +1032,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
         with c_t1:
             st.markdown(
                 '<div style="margin-bottom: 14px;">'
-                '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">📦 Dashboard Principal de Estoque</h1>'
+                '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">📦 Dashboard Principal de Estoque</h1>'
                 '<p style="color:#687787; font-size:0.9rem; margin:0;">Monitoramento consolidado de insumos, capital imobilizado e níveis de reposição.</p>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -1076,7 +1077,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
             st.markdown(
                 '<div class="mazon-kpi-card">'
                 '<div class="mazon-kpi-label">Alertas de Reposição</div>'
-                f'<div class="mazon-kpi-value" style="color:#D9383A;">{len(df_crit)}</div>'
+                f'<div class="mazon-kpi-value" style="color:#B91C1C;">{len(df_crit)}</div>'
                 '<div class="mazon-kpi-sub">Crítico / Falta ou Alerta</div>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -1085,7 +1086,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
             st.markdown(
                 '<div class="mazon-kpi-card">'
                 '<div class="mazon-kpi-label">Itens Abastecidos (OK)</div>'
-                f'<div class="mazon-kpi-value" style="color:#1F9D55;">{itens_ok}</div>'
+                f'<div class="mazon-kpi-value" style="color:#15803D;">{itens_ok}</div>'
                 '<div class="mazon-kpi-sub">Dentro da meta operacional</div>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -1106,7 +1107,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
         with g1:
             st.markdown(
                 '<div class="mazon-card" style="margin-bottom:8px; padding:1.1rem 1.4rem 0.4rem 1.4rem;">'
-                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Capital em Estoque por Categoria (R$)</h4>'
+                '<h4 style="margin:0; color:#0B192C; font-size:0.98rem;">Capital em Estoque por Categoria (R$)</h4>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -1121,14 +1122,14 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
                     x="Valor_Total_Item",
                     y="Categoria",
                     orientation="h",
-                    color_discrete_sequence=["#0B1B2B"],
+                    color_discrete_sequence=["#0B192C"],
                     text=df_cap_cat["Valor_Total_Item"].apply(formatar_moeda),
                 )
                 fig_cap.update_traces(textposition="outside")
                 fig_cap.update_layout(
-                    paper_bgcolor="#FFFFFF",
-                    plot_bgcolor="#FFFFFF",
-                    font=dict(color="#0B1B2B", family="Poppins"),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#0B192C", family="Plus Jakarta Sans, sans-serif"),
                     xaxis=dict(title="Valor (R$)", gridcolor="#EBE4D8"),
                     yaxis=dict(title=""),
                     margin=dict(l=10, r=90, t=15, b=15),
@@ -1141,7 +1142,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
         with g2:
             st.markdown(
                 '<div class="mazon-card" style="margin-bottom:8px; padding:1.1rem 1.4rem 0.4rem 1.4rem;">'
-                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Quantidade Total Contada por Categoria</h4>'
+                '<h4 style="margin:0; color:#0B192C; font-size:0.98rem;">Quantidade Total Contada por Categoria</h4>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -1153,13 +1154,13 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
                     names="Categoria",
                     values="Qtd_Atual",
                     hole=0.58,
-                    color_discrete_sequence=["#0B1B2B", "#D4A24C", "#1C354D", "#C59237", "#526375"],
+                    color_discrete_sequence=["#0B192C", "#B89758", "#1C354D", "#C59237", "#526375"],
                 )
-                fig_q.update_traces(textinfo="percent+label", textfont_color="#0B1B2B")
+                fig_q.update_traces(textinfo="percent+label", textfont_color="#0B192C")
                 fig_q.update_layout(
-                    paper_bgcolor="#FFFFFF",
-                    plot_bgcolor="#FFFFFF",
-                    font=dict(color="#0B1B2B", family="Poppins"),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#0B192C", family="Plus Jakarta Sans, sans-serif"),
                     showlegend=False,
                     margin=dict(l=10, r=10, t=15, b=15),
                     height=330,
@@ -1174,7 +1175,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
     elif subpagina == "› Gestão e Tabela de Estoque":
         st.markdown(
             '<div style="margin-bottom: 14px;">'
-            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">📦 Gestão e Tabela Analítica de Estoque</h1>'
+            '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">📦 Gestão e Tabela Analítica de Estoque</h1>'
             '<p style="color:#687787; font-size:0.9rem; margin:0;">Controle completo de saldos, entradas/saídas, parâmetros de reposição e exportação multiformato.</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -1330,7 +1331,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
             linhas_lista.append(
                 "<tr>"
                 f'<td style="font-weight:600; color:#9A6B1F;">{row["ID"]}</td>'
-                f'<td style="font-weight:500; color:#0B1B2B;">{row["Item"]}</td>'
+                f'<td style="font-weight:500; color:#0B192C;">{row["Item"]}</td>'
                 f'<td>{row["Categoria"]}</td>'
                 f'<td>{row["Unidade"]}</td>'
                 f'<td style="font-weight:600;">{float(row["Qtd_Atual"]):.2f}</td>'
@@ -1365,7 +1366,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
     elif subpagina == "› Comparativo de Preços":
         st.markdown(
             '<div style="margin-bottom: 14px;">'
-            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">⚖️ Comparativo de Preços entre Fornecedores</h1>'
+            '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">⚖️ Comparativo de Preços entre Fornecedores</h1>'
             '<p style="color:#687787; font-size:0.9rem; margin:0;">Compare cotações reais de insumos para identificar o menor custo unitário e otimizar as compras.</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -1444,7 +1445,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
     elif subpagina == "› Central OCR / IA":
         st.markdown(
             '<div style="margin-bottom: 14px;">'
-            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">🤖 Central OCR / IA — Leitura de Notas &amp; Atualização de Estoque</h1>'
+            '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">🤖 Central OCR / IA — Leitura de Notas &amp; Atualização de Estoque</h1>'
             '<p style="color:#687787; font-size:0.9rem; margin:0;">Envie uma Nota Fiscal/Cupom ou cole os itens da nota para atualizar o estoque e arquivar no Google Drive.</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -1530,7 +1531,7 @@ def renderizar_modulo_estoque(subpagina: str) -> None:
     elif subpagina == "› Gerador de Lista de Compras":
         st.markdown(
             '<div style="margin-bottom: 14px;">'
-            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">🛒 Gerador Oficial de Lista de Compras</h1>'
+            '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">🛒 Gerador Oficial de Lista de Compras</h1>'
             '<p style="color:#687787; font-size:0.9rem; margin:0;">Cálculo automático de reposição para insumos abaixo do estoque mínimo com exportação em CSV, XLSX e PDF.</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -1616,7 +1617,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
     if PERFIL_ATUAL == "Caixa" and not tem_permissao("fin_relatorios"):
         st.markdown(
             '<div style="margin-bottom: 18px;">'
-            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">💰 Lançamentos de Caixa &amp; Envio de Comprovantes</h1>'
+            '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">💰 Lançamentos de Caixa &amp; Envio de Comprovantes</h1>'
             '<p style="color:#687787; font-size:0.9rem; margin:0;">Registre o faturamento bruto diário e envie Notas Fiscais ou Comprovantes diretamente para a pasta oficial do Google Drive.</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -1850,7 +1851,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
     if subpagina == "› Lançamentos e NFs":
         st.markdown(
             '<div style="margin-bottom: 14px;">'
-            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">💰 Lançamentos Financeiros &amp; Gestão de Notas Fiscais</h1>'
+            '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">💰 Lançamentos Financeiros &amp; Gestão de Notas Fiscais</h1>'
             '<p style="color:#687787; font-size:0.9rem; margin:0;">Registro de receitas, despesas, arquivamento em nuvem no Google Drive e exportação multiformato.</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -1930,7 +1931,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
 
         linhas_fin_html = []
         for _, row in df_filtrado.sort_values("Data", ascending=False).iterrows():
-            cor_tipo = "#1F9D55" if row["Tipo"] == "Receita" else "#D9383A"
+            cor_tipo = "#15803D" if row["Tipo"] == "Receita" else "#B91C1C"
             link_str = str(row.get("Link_Comprovante", "-"))
             link_html = (
                 f'<a href="{link_str}" target="_blank" style="color:#9A6B1F; font-weight:600; text-decoration:underline;">Abrir no Drive</a>'
@@ -2014,7 +2015,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
         with cf1:
             st.markdown(
                 '<div style="margin-bottom: 14px;">'
-                '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">📈 Análise de Faturamento &amp; Canais de Venda</h1>'
+                '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">📈 Análise de Faturamento &amp; Canais de Venda</h1>'
                 f'<p style="color:#687787; font-size:0.9rem; margin:0;">Desempenho de receitas brutas no período selecionado ({periodo_texto}).</p>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -2076,16 +2077,16 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
         with g1:
             st.markdown(
                 '<div class="mazon-card" style="margin-bottom:8px; padding:1.1rem 1.4rem 0.4rem 1.4rem;">'
-                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Evolução Diária do Faturamento (R$)</h4></div>',
+                '<h4 style="margin:0; color:#0B192C; font-size:0.98rem;">Evolução Diária do Faturamento (R$)</h4></div>',
                 unsafe_allow_html=True,
             )
             if not df_receitas.empty and faturamento_bruto > 0:
                 df_fat_dia = df_receitas.groupby("Data", as_index=False)["Valor"].sum().sort_values("Data")
-                fig_f_dia = px.bar(df_fat_dia, x="Data", y="Valor", color_discrete_sequence=["#0B1B2B"])
+                fig_f_dia = px.bar(df_fat_dia, x="Data", y="Valor", color_discrete_sequence=["#0B192C"])
                 fig_f_dia.update_layout(
-                    paper_bgcolor="#FFFFFF",
-                    plot_bgcolor="#FFFFFF",
-                    font=dict(color="#0B1B2B", family="Poppins"),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#0B192C", family="Plus Jakarta Sans, sans-serif"),
                     height=320,
                     margin=dict(l=12, r=12, t=15, b=15),
                 )
@@ -2096,7 +2097,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
         with g2:
             st.markdown(
                 '<div class="mazon-card" style="margin-bottom:8px; padding:1.1rem 1.4rem 0.4rem 1.4rem;">'
-                '<h4 style="margin:0; color:#0B1B2B; font-size:0.98rem;">Faturamento por Forma de Pagamento</h4></div>',
+                '<h4 style="margin:0; color:#0B192C; font-size:0.98rem;">Faturamento por Forma de Pagamento</h4></div>',
                 unsafe_allow_html=True,
             )
             if not df_receitas.empty and faturamento_bruto > 0:
@@ -2106,13 +2107,13 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
                     names="Forma_Pagamento",
                     values="Valor",
                     hole=0.58,
-                    color_discrete_sequence=["#0B1B2B", "#D4A24C", "#1C354D", "#C59237", "#526375"],
+                    color_discrete_sequence=["#0B192C", "#B89758", "#1C354D", "#C59237", "#526375"],
                 )
-                fig_fp.update_traces(textinfo="percent+label", textfont_color="#0B1B2B")
+                fig_fp.update_traces(textinfo="percent+label", textfont_color="#0B192C")
                 fig_fp.update_layout(
-                    paper_bgcolor="#FFFFFF",
-                    plot_bgcolor="#FFFFFF",
-                    font=dict(color="#0B1B2B", family="Poppins"),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#0B192C", family="Plus Jakarta Sans, sans-serif"),
                     showlegend=False,
                     height=320,
                     margin=dict(l=10, r=10, t=15, b=15),
@@ -2141,7 +2142,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
         with cd1:
             st.markdown(
                 '<div style="margin-bottom: 14px;">'
-                '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">📊 DRE — Demonstrativo do Resultado do Exercício</h1>'
+                '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">📊 DRE — Demonstrativo do Resultado do Exercício</h1>'
                 f'<p style="color:#687787; font-size:0.9rem; margin:0;">Apuração contábil-gerencial consolidada ({periodo_texto}).</p>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -2184,7 +2185,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
                 unsafe_allow_html=True,
             )
         with k3:
-            cor_l = "#1F9D55" if lucro_liquido >= 0 else "#D9383A"
+            cor_l = "#15803D" if lucro_liquido >= 0 else "#B91C1C"
             st.markdown(
                 '<div class="mazon-kpi-card"><div class="mazon-kpi-label">Resultado Líquido</div>'
                 f'<div class="mazon-kpi-value" style="color:{cor_l};">{formatar_moeda(lucro_liquido)}</div>'
@@ -2218,15 +2219,15 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
                         formatar_moeda(lucro_liquido),
                     ],
                     y=[faturamento_bruto, -impostos_taxas, -cmv_insumos, -custos_fixos, lucro_liquido],
-                    increasing={"marker": {"color": "#1F9D55"}},
-                    decreasing={"marker": {"color": "#D9383A"}},
-                    totals={"marker": {"color": "#0B1B2B"}},
+                    increasing={"marker": {"color": "#15803D"}},
+                    decreasing={"marker": {"color": "#B91C1C"}},
+                    totals={"marker": {"color": "#0B192C"}},
                 )
             )
             fig_dre.update_layout(
-                paper_bgcolor="#FFFFFF",
-                plot_bgcolor="#FFFFFF",
-                font=dict(color="#0B1B2B", family="Poppins"),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#0B192C", family="Plus Jakarta Sans, sans-serif"),
                 yaxis=dict(title="R$", gridcolor="#EBE4D8"),
                 height=340,
                 margin=dict(l=15, r=15, t=25, b=15),
@@ -2250,7 +2251,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
         with ccmv1:
             st.markdown(
                 '<div style="margin-bottom: 14px;">'
-                '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">🍣 CMV — Custo de Mercadoria Vendida</h1>'
+                '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">🍣 CMV — Custo de Mercadoria Vendida</h1>'
                 f'<p style="color:#687787; font-size:0.9rem; margin:0;">Análise de compras de insumos e impacto percentual sobre a receita ({periodo_texto}).</p>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -2285,7 +2286,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
                 unsafe_allow_html=True,
             )
         with k2:
-            cor_cmv = "#1F9D55" if cmv_percentual <= 35.0 else "#D9383A"
+            cor_cmv = "#15803D" if cmv_percentual <= 35.0 else "#B91C1C"
             st.markdown(
                 '<div class="mazon-kpi-card"><div class="mazon-kpi-label">CMV sobre Faturamento (%)</div>'
                 f'<div class="mazon-kpi-value" style="color:{cor_cmv};">{cmv_percentual:.1f}%</div>'
@@ -2318,13 +2319,13 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
                 res_cmv,
                 x="Categoria",
                 y="Valor",
-                color_discrete_sequence=["#0B1B2B"],
+                color_discrete_sequence=["#0B192C"],
                 text=res_cmv["Valor"].apply(formatar_moeda),
             )
             fig_cmv.update_layout(
-                paper_bgcolor="#FFFFFF",
-                plot_bgcolor="#FFFFFF",
-                font=dict(color="#0B1B2B", family="Poppins"),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#0B192C", family="Plus Jakarta Sans, sans-serif"),
                 height=330,
             )
             st.plotly_chart(fig_cmv, use_container_width=True)
@@ -2345,7 +2346,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
         with cbe1:
             st.markdown(
                 '<div style="margin-bottom: 14px;">'
-                '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">🎯 Break-Even Point (Ponto de Equilíbrio Operacional)</h1>'
+                '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">🎯 Break-Even Point (Ponto de Equilíbrio Operacional)</h1>'
                 f'<p style="color:#687787; font-size:0.9rem; margin:0;">Faturamento mínimo necessário para cobrir 100% dos custos fixos e variáveis ({periodo_texto}).</p>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -2415,13 +2416,13 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
             x="Métrica",
             y="Valor",
             color="Métrica",
-            color_discrete_sequence=["#0B1B2B", "#D4A24C", "#526375", "#9A6B1F"],
+            color_discrete_sequence=["#0B192C", "#B89758", "#526375", "#9A6B1F"],
             text=df_be_comp["Valor"].apply(formatar_moeda),
         )
         fig_be.update_layout(
             paper_bgcolor="#FFFFFF",
             plot_bgcolor="#FFFFFF",
-            font=dict(color="#0B1B2B", family="Poppins"),
+            font=dict(color="#0B192C", family="Poppins"),
             showlegend=False,
             height=330,
         )
@@ -2455,7 +2456,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
         with crd1:
             st.markdown(
                 '<div style="margin-bottom: 14px;">'
-                '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">📑 Relatório Descritivo Executivo</h1>'
+                '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">📑 Relatório Descritivo Executivo</h1>'
                 f'<p style="color:#687787; font-size:0.9rem; margin:0;">Diagnóstico textual e analítico consolidado do período ({periodo_texto}).</p>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -2486,7 +2487,7 @@ def renderizar_modulo_financeiro(subpagina: str) -> None:
         for titulo_s, texto_s in secoes_desc:
             st.markdown(
                 f'<div class="mazon-card" style="margin-bottom: 12px;">'
-                f'<h4 style="margin:0 0 6px 0; color:#0B1B2B;">{titulo_s}</h4>'
+                f'<h4 style="margin:0 0 6px 0; color:#0B192C;">{titulo_s}</h4>'
                 f'<p style="margin:0; color:#526375; font-size:0.92rem; line-height:1.65;">{texto_s}</p>'
                 "</div>",
                 unsafe_allow_html=True,
@@ -2508,7 +2509,7 @@ def renderizar_modulo_auditoria_usuarios(subpagina: str) -> None:
     if subpagina == "› Log de Auditoria":
         st.markdown(
             '<div style="margin-bottom: 14px;">'
-            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">🛡️ Logs de Auditoria &amp; Rastreabilidade</h1>'
+            '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">🛡️ Logs de Auditoria &amp; Rastreabilidade</h1>'
             '<p style="color:#687787; font-size:0.9rem; margin:0;">Histórico de operações gravado na aba <code>Logs_Auditoria</code> com exportação em CSV, XLSX e PDF.</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -2525,7 +2526,7 @@ def renderizar_modulo_auditoria_usuarios(subpagina: str) -> None:
             st.markdown(
                 '<div class="mazon-card" style="padding:0.9rem 1.3rem;">'
                 '<span class="badge-best-price">AUTORIDADE TOTAL DEV (ARTHUR)</span>'
-                '<span style="margin-left:10px; font-size:0.86rem; color:#0B1B2B;">Visualizando 100% do Log Geral do Sistema (Autenticação, Usuários, Estoque, Caixa e Financeiro).</span>'
+                '<span style="margin-left:10px; font-size:0.86rem; color:#0B192C;">Visualizando 100% do Log Geral do Sistema (Autenticação, Usuários, Estoque, Caixa e Financeiro).</span>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -2561,7 +2562,7 @@ def renderizar_modulo_auditoria_usuarios(subpagina: str) -> None:
             linhas_log_html.append(
                 "<tr>"
                 f'<td style="color:#687787; font-size:0.82rem;">{row["Data_Hora"]}</td>'
-                f'<td style="font-weight:600; color:#0B1B2B;">{row["Usuario"]}</td>'
+                f'<td style="font-weight:600; color:#0B192C;">{row["Usuario"]}</td>'
                 f'<td><span class="badge-alerta">{row["Perfil"]}</span></td>'
                 f'<td>{row["Acao"]}</td>'
                 f'<td style="font-weight:600; color:#9A6B1F;">{row["Modulo"]}</td>'
@@ -2589,7 +2590,7 @@ def renderizar_modulo_auditoria_usuarios(subpagina: str) -> None:
     elif subpagina == "› Gestão de Usuários & Permissões":
         st.markdown(
             '<div style="margin-bottom: 14px;">'
-            '<h1 style="margin-bottom:2px; color:#0B1B2B; font-size:1.7rem;">🔐 Gestão de Usuários, Hierarquia &amp; Permissões Granulares</h1>'
+            '<h1 style="margin-bottom:2px; color:#0B192C; font-size:1.7rem;">🔐 Gestão de Usuários, Hierarquia &amp; Permissões Granulares</h1>'
             '<p style="color:#687787; font-size:0.9rem; margin:0;">Gerencie contas ativas/inativas, atribua cargos respeitando a hierarquia e personalize permissões por módulo.</p>'
             "</div>",
             unsafe_allow_html=True,
@@ -2603,7 +2604,7 @@ def renderizar_modulo_auditoria_usuarios(subpagina: str) -> None:
             st.markdown(
                 '<div class="mazon-card" style="padding:0.85rem 1.25rem; margin-bottom:14px;">'
                 '<span class="badge-best-price">HIERARQUIA DEV (ARTHUR)</span>'
-                '<span style="margin-left:10px; font-size:0.86rem; color:#0B1B2B;">Autoridade máxima ativa: Você pode visualizar, criar e promover contas para qualquer nível, incluindo <strong>Dev</strong>.</span>'
+                '<span style="margin-left:10px; font-size:0.86rem; color:#0B192C;">Autoridade máxima ativa: Você pode visualizar, criar e promover contas para qualquer nível, incluindo <strong>Dev</strong>.</span>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -2612,7 +2613,7 @@ def renderizar_modulo_auditoria_usuarios(subpagina: str) -> None:
             st.markdown(
                 '<div class="mazon-card" style="padding:0.85rem 1.25rem; margin-bottom:14px;">'
                 '<span class="badge-alerta">HIERARQUIA GERENTE</span>'
-                '<span style="margin-left:10px; font-size:0.86rem; color:#0B1B2B;">Você pode criar e gerenciar perfis até o nível <strong>Gerente</strong>. Contas de nível <strong>Dev</strong> são protegidas e ocultas.</span>'
+                '<span style="margin-left:10px; font-size:0.86rem; color:#0B192C;">Você pode criar e gerenciar perfis até o nível <strong>Gerente</strong>. Contas de nível <strong>Dev</strong> são protegidas e ocultas.</span>'
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -2627,7 +2628,7 @@ def renderizar_modulo_auditoria_usuarios(subpagina: str) -> None:
             perms_legiveis = ", ".join(perms_codigos)
             linhas_u_html.append(
                 "<tr>"
-                f'<td style="font-weight:600; color:#0B1B2B;">{r_u["Usuario"]}</td>'
+                f'<td style="font-weight:600; color:#0B192C;">{r_u["Usuario"]}</td>'
                 f'<td><span class="badge-alerta">{r_u["Perfil"]}</span></td>'
                 f"<td>{badge_u}</td>"
                 f'<td>{r_u.get("Data_Cadastro", "-")}</td>'

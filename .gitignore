@@ -4,3 +4,4 @@ dist/
 __pycache__/
 credentials.json
 *.spec
+.agent/

@@ -1,580 +1,257 @@
 /* ==========================================================================
-   RESTAURANTE MAZON - DESIGN SYSTEM "LUXURY MINIMALIST UI"
-   Paleta Oficial inspirada na Logo Mazon (Cream #F4EDE3 & Deep Navy #0B1B2B)
+   RESTAURANTE MAZON — EXECUTIVE UI/UX DESIGN SYSTEM
+   Paleta Executiva:
+   - Fundo Principal (Areia / Creme Suave): #F6F2EA
+   - Superfícies e Cards (Branco Puro):     #FFFFFF
+   - Primária (Azul Marinho Profundo):      #0B192C
+   - Destaque (Dourado / Bronze Fosco):     #B89758
+   - Semântica Positiva (Verde Esmeralda):  #15803D
+   - Semântica Crítica (Coral / Terracota): #B91C1C
+   Tipografia:
+   - Títulos Display & Login: 'Playfair Display', Georgia, serif
+   - Interface & Dados Tabulares: 'Plus Jakarta Sans', -apple-system, sans-serif
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-    --bg-canvas: #F4EDE3;        /* Creme / Palha exato da logo */
-    --bg-sidebar: #0B1B2B;       /* Azul Marinho Profundo exato da logo */
-    --bg-card: #FFFFFF;          /* Branco minimalista */
-    --bg-card-soft: #FAF7F2;     /* Creme sutil */
-    --border-subtle: #EBE4D8;    /* Borda quase imperceptível */
-    --text-navy: #0B1B2B;        /* Texto principal Azul Marinho */
-    --text-muted: #687787;       /* Texto secundário suave */
-    --sidebar-text: #C5D1DE;     /* Texto inativo na sidebar */
-    --cream-light: #F4EDE3;      /* Texto claro sobre fundo marinho */
-    --gold-accent: #D4A24C;      /* Dourado Mazon */
-    --alert-critical: #D9383A;   /* Vermelho minimalista */
-    --status-ok: #1F9D55;        /* Verde elegante */
-    --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-    --card-radius: 12px;
+    --bg-main: #F6F2EA;
+    --bg-sidebar: #0B192C;
+    --bg-sidebar-elevated: #11243D;
+    --bg-card: #FFFFFF;
+    --bg-card-alt: #FAF8F4;
+    --text-primary: #0B192C;
+    --text-secondary: #475569;
+    --text-muted: #64748B;
+    --gold-accent: #B89758;
+    --gold-accent-soft: rgba(184, 151, 88, 0.14);
+    --gold-border: rgba(184, 151, 88, 0.42);
+    --cream-light: #F6F2EA;
+    --sidebar-text: #CBD5E1;
+    --border-subtle: rgba(11, 25, 44, 0.08);
+    --border-strong: rgba(11, 25, 44, 0.14);
+    --semantic-positive: #15803D;
+    --semantic-positive-bg: rgba(21, 128, 61, 0.09);
+    --semantic-critical: #B91C1C;
+    --semantic-critical-bg: rgba(185, 28, 28, 0.09);
+    --card-radius: 14px;
+    --card-shadow: 0 4px 20px -2px rgba(11, 25, 44, 0.05), 0 2px 6px -1px rgba(11, 25, 44, 0.03);
+    --card-shadow-hover: 0 12px 28px -4px rgba(11, 25, 44, 0.09), 0 4px 10px -2px rgba(11, 25, 44, 0.04);
+    --ease-out-quart: cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* 1. Tipografia Poppins restrita EXCLUSIVAMENTE a elementos de texto */
-html, body, p, h1, h2, h3, h4, h5, h6,
-label, input, button, select, textarea,
-td, th, .stMarkdown p {
-    font-family: 'Poppins', sans-serif !important;
+/* 1. Suavização de Fonte na Raiz e Seleção de Texto */
+html, body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 
-/* 2. Proteção Absoluta para Ícones do Streamlit (Material Symbols / Icons) */
-[data-testid="stIcon"],
-[data-testid="stIconMaterial"],
-span[data-testid="stIconMaterial"],
-button [data-testid="stIconMaterial"],
-summary [data-testid="stIconMaterial"],
-header [data-testid="stIconMaterial"],
-i,
+::selection {
+    background-color: rgba(184, 151, 88, 0.25);
+    color: var(--text-primary);
+}
+
+/* 2. Tipografia Semântica (Sem afetar seletores de ícones Material) */
+html, body, p, label, input, button, select, textarea, td, th, .stMarkdown p, .stCaption {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+h1, .mazon-display-title, .mazon-login-box h2 {
+    font-family: 'Playfair Display', Georgia, serif !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.015em !important;
+    color: var(--text-primary) !important;
+    text-wrap: balance;
+}
+
+h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-weight: 600 !important;
+    line-height: 1.28 !important;
+    letter-spacing: -0.01em !important;
+    color: var(--text-primary) !important;
+}
+
+/* Proteção estrita para os ícones nativos do Streamlit (Material Symbols) */
+.material-symbols-rounded,
 .material-symbols-outlined,
 .material-icons,
-[class*="st-emotion-cache"] i {
-    font-family: 'Material Symbols Outlined', 'Material Symbols Rounded', 'Material Icons' !important;
+[data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapseButton"] span,
+[data-testid="collapsedControl"] span,
+[data-testid="stExpanderToggleIcon"] span,
+span[data-baseweb="icon"] {
+    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
     font-weight: normal !important;
     font-style: normal !important;
+    line-height: 1 !important;
     letter-spacing: normal !important;
     text-transform: none !important;
-    line-height: 1 !important;
+    white-space: nowrap !important;
+    word-wrap: normal !important;
+    direction: ltr !important;
 }
 
-/* 3. Fundo do App (Main Canvas) e Texto Global */
+/* 3. Fundo Principal (Areia / Creme Suave #F6F2EA) e Layout */
 .stApp,
-[data-testid="stAppViewContainer"] {
-    background-color: var(--bg-canvas) !important;
-    color: var(--text-navy) !important;
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] {
+    background-color: var(--bg-main) !important;
+    color: var(--text-primary) !important;
 }
 
-header[data-testid="stHeader"] {
-    background-color: transparent !important;
+[data-testid="stHeader"] {
+    background-color: rgba(246, 242, 234, 0.88) !important;
+    backdrop-filter: blur(8px);
+    height: 3.2rem !important;
 }
 
 .block-container {
-    padding-top: 2rem !important;
+    padding-top: 1.4rem !important;
     padding-bottom: 3rem !important;
+    max-width: 1440px !important;
 }
 
-h1, h2, h3, h4, h5, h6, .mazon-title {
-    color: var(--text-navy) !important;
-    font-weight: 500 !important;
-    letter-spacing: -0.3px;
-}
-
-p, label {
-    color: var(--text-navy);
-}
-
-/* 4. Botão Nativo de Expandir / Recolher a Sidebar sempre visível e minimalista */
-[data-testid="stSidebarCollapseButton"],
+/* 4. Botão de Expandir/Recolher a Sidebar sempre visível */
 [data-testid="collapsedControl"],
-[data-testid="stExpandSidebarButton"] {
-    visibility: visible !important;
+[data-testid="stSidebarCollapsedControl"] {
     display: flex !important;
+    visibility: visible !important;
     opacity: 1 !important;
-}
-
-[data-testid="stSidebarCollapseButton"] button {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(244, 237, 227, 0.12) !important;
-    border-radius: 8px !important;
-    color: var(--cream-light) !important;
-    padding: 4px !important;
-    box-shadow: none !important;
-    transition: all 0.2s ease !important;
-}
-
-[data-testid="stSidebarCollapseButton"] button:hover {
-    background: rgba(212, 162, 76, 0.15) !important;
-    border-color: var(--gold-accent) !important;
-    color: var(--gold-accent) !important;
-}
-
-[data-testid="collapsedControl"] button,
-[data-testid="stExpandSidebarButton"] button {
-    background-color: var(--bg-sidebar) !important;
-    color: var(--cream-light) !important;
-    border: 1px solid rgba(212, 162, 76, 0.4) !important;
-    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 10px !important;
     box-shadow: var(--card-shadow) !important;
+    z-index: 999999 !important;
 }
 
-/* 5. Barra Lateral (Sidebar) em Azul Marinho Profundo (#0B1B2B) */
+[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button {
+    color: var(--cream-light) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(184, 151, 88, 0.3) !important;
+    border-radius: 8px !important;
+}
+
+/* 5. Sidebar Contextual em Azul Marinho Profundo (#0B192C) */
 section[data-testid="stSidebar"],
-div[data-testid="stSidebar"] {
+[data-testid="stSidebar"] > div:first-child {
     background-color: var(--bg-sidebar) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-right: 1px solid rgba(184, 151, 88, 0.22) !important;
+    overscroll-behavior: contain;
 }
 
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] .stMarkdown,
 section[data-testid="stSidebar"] h1,
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3,
-section[data-testid="stSidebar"] h4,
-section[data-testid="stSidebar"] p,
-section[data-testid="stSidebar"] label {
-    color: var(--sidebar-text) !important;
+section[data-testid="stSidebar"] h4 {
+    color: var(--cream-light) !important;
 }
 
-/* Logo Integrada à Sidebar sem Card ou Fundo ao redor */
-section[data-testid="stSidebar"] [data-testid="stImage"],
-div[data-testid="stSidebar"] [data-testid="stImage"] {
+/* Logo na Sidebar com moldura limpa e contraste elegante */
+section[data-testid="stSidebar"] [data-testid="stImage"] {
     background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 8px !important;
-    margin: 4px auto 14px auto !important;
+    padding: 4px 10px 6px 10px !important;
+    margin-bottom: 2px !important;
 }
 
-section[data-testid="stSidebar"] [data-testid="stImage"] img,
-div[data-testid="stSidebar"] [data-testid="stImage"] img {
+section[data-testid="stSidebar"] [data-testid="stImage"] img {
     border-radius: 12px !important;
-    background: transparent !important;
-    padding: 0 !important;
-    margin: 0 auto !important;
     display: block;
+    margin: 0 auto;
+    border: 1px solid rgba(184, 151, 88, 0.22);
 }
 
-/* 6. Esconde totalmente a bolinha/círculo do st.radio (todas as versões do Streamlit) */
-div[data-testid="stRadioButton"] [role="radio"],
-div[data-testid="stRadioButton"] label > div:first-child,
-div[data-baseweb="radio"] > div:first-child,
-label[data-baseweb="radio"] > div:first-child,
-div[data-testid="stRadio"] label > div:first-child,
-div[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child,
-section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+/* Sub-páginas da Sidebar (Pills Minimalistas com Destaque Dourado #B89758) */
+div[data-testid="stSidebar"] div[role="radiogroup"] {
+    gap: 4px !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
     display: none !important;
-    visibility: hidden !important;
-    width: 0px !important;
-    height: 0px !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
-div[data-testid="stRadioButton"] label,
-div[data-testid="stRadio"] label,
-div[data-testid="stSidebar"] div[role="radiogroup"] label,
-section[data-testid="stSidebar"] div[role="radiogroup"] label {
-    cursor: pointer;
-    padding: 6px 10px !important;
-    border-radius: 6px !important;
-    margin-bottom: 6px !important;
-    transition: background-color 0.2s ease !important;
-    color: #C5D1DE !important;
-    font-size: 0.9rem !important;
+div[data-testid="stSidebar"] div[role="radiogroup"] label {
+    padding: 10px 14px !important;
+    border-radius: 9px !important;
+    margin-bottom: 3px !important;
     background: transparent !important;
     border: 1px solid transparent !important;
-    box-shadow: none !important;
+    border-left: 3px solid transparent !important;
+    transition-property: background-color, color, border-color, transform !important;
+    transition-duration: 150ms !important;
+    transition-timing-function: var(--ease-out-quart) !important;
+    cursor: pointer !important;
 }
 
-div[data-testid="stSidebar"] div[role="radiogroup"] label p,
-section[data-testid="stSidebar"] div[role="radiogroup"] label p {
-    color: #C5D1DE !important;
-    font-size: 0.9rem !important;
-    font-weight: 400 !important;
-    margin: 0 !important;
-    transition: color 0.2s ease !important;
+div[data-testid="stSidebar"] div[role="radiogroup"] label p {
+    color: var(--sidebar-text) !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
 }
 
-div[data-testid="stSidebar"] div[role="radiogroup"] label:hover,
-section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-    color: #FFFFFF !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-}
-
-div[data-testid="stSidebar"] div[role="radiogroup"] label:hover p,
-section[data-testid="stSidebar"] div[role="radiogroup"] label:hover p {
-    color: #FFFFFF !important;
+@media (hover: hover) {
+    div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-left-color: rgba(184, 151, 88, 0.5) !important;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label:hover p {
+        color: #FFFFFF !important;
+    }
 }
 
 div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked),
-section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-    background: rgba(212, 162, 76, 0.08) !important;
-    color: #D4A24C !important;
-    border-left: 2px solid #D4A24C !important;
+div[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
+    background: var(--gold-accent-soft) !important;
+    border: 1px solid rgba(184, 151, 88, 0.28) !important;
+    border-left: 3px solid var(--gold-accent) !important;
 }
 
 div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p,
-section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
-    color: #D4A24C !important;
-    font-weight: 500 !important;
-}
-
-/* Inputs dentro da Sidebar */
-section[data-testid="stSidebar"] div[data-baseweb="select"] > div,
-section[data-testid="stSidebar"] div[data-baseweb="input"] > div,
-section[data-testid="stSidebar"] .stNumberInput div[data-baseweb="input"] > div {
-    background-color: rgba(255, 255, 255, 0.05) !important;
-    border-color: rgba(244, 237, 227, 0.14) !important;
-    color: var(--cream-light) !important;
-    border-radius: 8px !important;
-    box-shadow: none !important;
-}
-
-section[data-testid="stSidebar"] input {
-    color: var(--cream-light) !important;
-}
-
-/* 7. Refinamento Minimalista dos Cards e KPIs (Sem bordas grossas coloridas no topo) */
-.mazon-card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--card-radius);
-    padding: 1.4rem 1.5rem;
-    margin-bottom: 1.2rem;
-    box-shadow: var(--card-shadow);
-}
-
-.mazon-kpi-card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--card-radius);
-    padding: 1.35rem 1.5rem;
-    text-align: left;
-    box-shadow: var(--card-shadow);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.mazon-kpi-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(11, 27, 43, 0.05);
-}
-
-.mazon-kpi-label {
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.76rem;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-muted);
-    margin-bottom: 6px;
-    font-weight: 400;
-}
-
-.mazon-kpi-value {
-    font-family: 'Poppins', sans-serif;
-    font-size: 1.85rem;
-    font-weight: 600;
-    color: var(--text-navy);
-    line-height: 1.2;
-}
-
-.mazon-kpi-sub {
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.78rem;
-    font-weight: 300;
-    color: var(--text-muted);
-    margin-top: 6px;
-}
-
-/* 8. Card de Alertas / Contagem Minimalista */
-.critical-hero-card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--card-radius);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: var(--card-shadow);
-}
-
-.critical-hero-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 12px;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.critical-hero-title {
-    font-family: 'Poppins', sans-serif;
-    font-size: 1.02rem;
-    font-weight: 600;
-    color: var(--text-navy);
-    letter-spacing: 0.1px;
-}
-
-.critical-items-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 10px;
-    margin-top: 14px;
-}
-
-.critical-item-pill {
-    background-color: var(--bg-card-soft);
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 11px 14px;
-    transition: border-color 0.15s ease;
-}
-
-.critical-item-pill:hover {
-    border-color: var(--gold-accent);
-}
-
-/* 9. Badges Minimalistas */
-.badge-critico {
-    background-color: rgba(217, 56, 58, 0.08);
-    color: #C8232C;
-    border: 1px solid rgba(217, 56, 58, 0.25);
-    padding: 3px 10px;
-    border-radius: 99px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    display: inline-block;
-}
-
-.badge-alerta {
-    background-color: rgba(212, 162, 76, 0.12);
-    color: #9A6B1F;
-    border: 1px solid rgba(212, 162, 76, 0.4);
-    padding: 3px 10px;
-    border-radius: 99px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    display: inline-block;
-}
-
-.badge-ok {
-    background-color: rgba(31, 157, 85, 0.08);
-    color: #187941;
-    border: 1px solid rgba(31, 157, 85, 0.25);
-    padding: 3px 10px;
-    border-radius: 99px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    display: inline-block;
-}
-
-.badge-pendente {
-    background-color: rgba(11, 27, 43, 0.04);
-    color: var(--text-muted);
-    border: 1px solid var(--border-subtle);
-    padding: 3px 10px;
-    border-radius: 99px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    display: inline-block;
-}
-
-.badge-best-price {
-    background-color: var(--bg-sidebar);
-    color: var(--cream-light);
-    border: 1px solid rgba(212, 162, 76, 0.6);
-    padding: 4px 12px;
-    border-radius: 99px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    display: inline-block;
-}
-
-/* 10. Botões Primários e Download */
-.stButton > button,
-.stDownloadButton > button,
-button[kind="primaryFormSubmit"],
-[data-testid="stFormSubmitButton"] > button {
-    background-color: var(--bg-sidebar) !important;
-    color: var(--cream-light) !important;
-    font-weight: 500 !important;
-    border: 1px solid rgba(212, 162, 76, 0.5) !important;
-    border-radius: 10px !important;
-    padding: 0.55rem 1.2rem !important;
-    box-shadow: var(--card-shadow) !important;
-    transition: all 0.2s ease !important;
-}
-
-.stButton > button p,
-.stDownloadButton > button p,
-[data-testid="stFormSubmitButton"] > button p {
-    color: var(--cream-light) !important;
-}
-
-.stButton > button:hover,
-.stDownloadButton > button:hover,
-button[kind="primaryFormSubmit"]:hover,
-[data-testid="stFormSubmitButton"] > button:hover {
-    background-color: #132A40 !important;
-    border-color: var(--gold-accent) !important;
+div[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] p {
     color: #FFFFFF !important;
-    transform: translateY(-1px);
-}
-
-/* 11. Inputs, Selectboxes, Expanders e File Uploader Minimalistas */
-div[data-baseweb="input"] > div,
-div[data-baseweb="select"] > div,
-.stNumberInput div[data-baseweb="input"] > div {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 10px !important;
-    color: var(--text-navy) !important;
-    box-shadow: none !important;
-}
-
-div[data-testid="stExpander"] {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--card-radius) !important;
-    box-shadow: var(--card-shadow);
-    overflow: hidden;
-}
-
-section[data-testid="stFileUploaderDropzone"] {
-    background-color: var(--bg-card) !important;
-    border: 1.5px dashed var(--gold-accent) !important;
-    border-radius: var(--card-radius) !important;
-    padding: 26px !important;
-    box-shadow: var(--card-shadow);
-}
-
-/* 12. Tabelas Minimalistas Arredondadas */
-.mazon-table-wrapper {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--card-radius);
-    box-shadow: var(--card-shadow);
-    overflow: hidden;
-    margin-bottom: 1.25rem;
-}
-
-.mazon-table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: var(--bg-card);
-    font-size: 0.87rem;
-}
-
-.mazon-table thead tr {
-    background-color: var(--bg-sidebar);
-    border-bottom: 1px solid var(--border-subtle);
-    text-align: left;
-}
-
-.mazon-table th {
-    padding: 13px 16px;
-    color: var(--cream-light);
-    font-weight: 500;
-    text-transform: uppercase;
-    font-size: 0.74rem;
-    letter-spacing: 0.6px;
-}
-
-.mazon-table td {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-subtle);
-    color: var(--text-navy);
-}
-
-.mazon-table tbody tr:nth-child(even) {
-    background-color: var(--bg-card-soft);
-}
-
-.mazon-table tbody tr:hover {
-    background-color: rgba(212, 162, 76, 0.08);
-}
-
-/* Divisores */
-hr {
-    border-color: var(--border-subtle) !important;
-}
-
-/* 13. Navegação por Tabs Superiores Dinâmicas (st.tabs) */
-div[data-baseweb="tab-list"] {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 12px !important;
-    padding: 6px 10px !important;
-    gap: 8px !important;
-    box-shadow: var(--card-shadow) !important;
-    margin-bottom: 1.25rem !important;
-}
-
-button[data-baseweb="tab"] {
-    background-color: transparent !important;
-    color: var(--text-muted) !important;
-    border-radius: 8px !important;
-    padding: 10px 20px !important;
-    font-weight: 500 !important;
-    font-size: 0.92rem !important;
-    border: none !important;
-    box-shadow: none !important;
-    transition: all 0.2s ease !important;
-}
-
-button[data-baseweb="tab"] p {
-    color: var(--text-muted) !important;
-    font-weight: 500 !important;
-}
-
-button[data-baseweb="tab"]:hover {
-    background-color: var(--bg-card-soft) !important;
-    color: var(--text-navy) !important;
-}
-
-button[data-baseweb="tab"]:hover p {
-    color: var(--text-navy) !important;
-}
-
-button[data-baseweb="tab"][aria-selected="true"] {
-    background-color: var(--bg-sidebar) !important;
-    color: var(--cream-light) !important;
-    border: 1px solid rgba(212, 162, 76, 0.6) !important;
-}
-
-button[data-baseweb="tab"][aria-selected="true"] p {
-    color: var(--cream-light) !important;
     font-weight: 600 !important;
 }
 
-div[data-baseweb="tab-highlight"] {
-    display: none !important;
-}
-
-/* 14. Card de Login Centralizado */
-.mazon-login-box {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-top: 4px solid var(--bg-sidebar);
-    border-radius: 16px;
-    padding: 2rem 2.2rem;
-    box-shadow: 0 10px 30px rgba(11, 27, 43, 0.08);
-    text-align: center;
-    margin-bottom: 1rem;
-}
-
-/* 15. Barra de Tabs Superiores em Cascata (Main Canvas Horizontal Radio) */
-div[data-testid="stMain"] div[role="radiogroup"] {
+/* 6. Tabs Superiores Principais (Linha Inferior Dourada #B89758 na Aba Ativa) */
+div[data-testid="stMain"] div[role="radiogroup"],
+div[data-baseweb="tab-list"] {
     background-color: var(--bg-card) !important;
     border: 1px solid var(--border-subtle) !important;
-    border-radius: 12px !important;
-    padding: 6px 10px !important;
-    gap: 8px !important;
+    border-radius: var(--card-radius) !important;
+    padding: 6px 12px 0px 12px !important;
+    gap: 10px !important;
     box-shadow: var(--card-shadow) !important;
-    margin-bottom: 1rem !important;
+    margin-bottom: 1.35rem !important;
     display: flex !important;
     flex-wrap: wrap !important;
     align-items: center !important;
 }
 
-div[data-testid="stMain"] div[role="radiogroup"] label {
+div[data-testid="stMain"] div[role="radiogroup"] label,
+button[data-baseweb="tab"] {
     background-color: transparent !important;
-    color: var(--text-muted) !important;
-    border-radius: 8px !important;
-    padding: 9px 18px !important;
+    color: var(--text-secondary) !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 11px 20px 12px 20px !important;
     font-weight: 500 !important;
     font-size: 0.92rem !important;
-    border: 1px solid transparent !important;
+    border: none !important;
+    border-bottom: 3px solid transparent !important;
     cursor: pointer !important;
-    transition: all 0.2s ease !important;
+    transition-property: color, background-color, border-color !important;
+    transition-duration: 150ms !important;
+    transition-timing-function: var(--ease-out-quart) !important;
     margin: 0 !important;
 }
 
@@ -584,21 +261,395 @@ div[data-testid="stMain"] div[role="radiogroup"] label > div:first-child {
     height: 0px !important;
 }
 
-div[data-testid="stMain"] div[role="radiogroup"] label:hover {
-    background-color: var(--bg-card-soft) !important;
-    color: var(--text-navy) !important;
+div[data-testid="stMain"] div[role="radiogroup"] label p,
+button[data-baseweb="tab"] p {
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+    font-size: 0.92rem !important;
 }
 
-div[data-testid="stMain"] div[role="radiogroup"] label:has(input:checked) {
-    background-color: var(--bg-sidebar) !important;
-    color: var(--cream-light) !important;
-    border: 1px solid rgba(212, 162, 76, 0.65) !important;
+@media (hover: hover) {
+    div[data-testid="stMain"] div[role="radiogroup"] label:hover,
+    button[data-baseweb="tab"]:hover {
+        background-color: var(--bg-card-alt) !important;
+        color: var(--text-primary) !important;
+        border-bottom-color: rgba(184, 151, 88, 0.45) !important;
+    }
+    div[data-testid="stMain"] div[role="radiogroup"] label:hover p,
+    button[data-baseweb="tab"]:hover p {
+        color: var(--text-primary) !important;
+    }
+}
+
+div[data-testid="stMain"] div[role="radiogroup"] label:has(input:checked),
+button[data-baseweb="tab"][aria-selected="true"] {
+    background-color: rgba(11, 25, 44, 0.03) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 3px solid var(--gold-accent) !important;
     font-weight: 600 !important;
 }
 
 div[data-testid="stMain"] div[role="radiogroup"] label:has(input:checked) p,
 div[data-testid="stMain"] div[role="radiogroup"] label:has(input:checked) span,
-div[data-testid="stMain"] div[role="radiogroup"] label:has(input:checked) div {
+div[data-testid="stMain"] div[role="radiogroup"] label:has(input:checked) div,
+button[data-baseweb="tab"][aria-selected="true"] p {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+}
+
+div[data-baseweb="tab-highlight"] {
+    display: none !important;
+}
+
+/* 7. Superfícies, Containers e Cards de KPIs com Micro-Animação e Números Tabulares */
+.mazon-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--card-radius);
+    padding: 1.35rem 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--card-shadow);
+}
+
+.mazon-kpi-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-top: 3px solid var(--bg-sidebar);
+    border-radius: var(--card-radius);
+    padding: 1.25rem 1.35rem;
+    min-height: 132px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 0.85rem;
+    transition-property: transform, box-shadow, border-color;
+    transition-duration: 180ms;
+    transition-timing-function: var(--ease-out-quart);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .mazon-kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--card-shadow-hover);
+        border-top-color: var(--gold-accent);
+    }
+}
+
+.mazon-kpi-label {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.mazon-kpi-value {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.18;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.mazon-kpi-sub {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+/* 8. Card de Alertas Operacionais */
+.critical-hero-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-left: 4px solid var(--semantic-critical);
+    border-radius: var(--card-radius);
+    padding: 1.4rem 1.5rem;
+    margin-bottom: 1.4rem;
+    box-shadow: var(--card-shadow);
+}
+
+.critical-hero-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.critical-hero-title {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.critical-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.critical-item-pill {
+    background-color: var(--bg-card-alt);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition-property: border-color, box-shadow;
+    transition-duration: 150ms;
+}
+
+@media (hover: hover) {
+    .critical-item-pill:hover {
+        border-color: var(--gold-accent);
+        box-shadow: var(--card-shadow);
+    }
+}
+
+/* 9. Badges Semânticas Executivas */
+.badge-critico {
+    background-color: var(--semantic-critical-bg);
+    color: var(--semantic-critical);
+    border: 1px solid rgba(185, 28, 28, 0.25);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.badge-alerta {
+    background-color: rgba(184, 151, 88, 0.15);
+    color: #856830;
+    border: 1px solid rgba(184, 151, 88, 0.42);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.badge-ok {
+    background-color: var(--semantic-positive-bg);
+    color: var(--semantic-positive);
+    border: 1px solid rgba(21, 128, 61, 0.25);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.badge-pendente {
+    background-color: rgba(11, 25, 44, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.badge-best-price {
+    background-color: var(--bg-sidebar);
+    color: var(--cream-light);
+    border: 1px solid var(--gold-accent);
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/* 10. Botões Primários, Submits e Downloads (#0B192C + Acento #B89758) */
+.stButton > button,
+.stDownloadButton > button,
+button[kind="primaryFormSubmit"],
+[data-testid="stFormSubmitButton"] > button {
+    background-color: var(--bg-sidebar) !important;
     color: var(--cream-light) !important;
     font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    border: 1px solid var(--gold-border) !important;
+    border-radius: 10px !important;
+    padding: 0.58rem 1.25rem !important;
+    box-shadow: var(--card-shadow) !important;
+    transition-property: background-color, border-color, transform, box-shadow !important;
+    transition-duration: 160ms !important;
+    transition-timing-function: var(--ease-out-quart) !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.stButton > button p,
+.stDownloadButton > button p,
+[data-testid="stFormSubmitButton"] > button p {
+    color: var(--cream-light) !important;
+    font-weight: 600 !important;
+}
+
+@media (hover: hover) {
+    .stButton > button:hover,
+    .stDownloadButton > button:hover,
+    button[kind="primaryFormSubmit"]:hover,
+    [data-testid="stFormSubmitButton"] > button:hover {
+        background-color: var(--bg-sidebar-elevated) !important;
+        border-color: var(--gold-accent) !important;
+        color: #FFFFFF !important;
+        box-shadow: var(--card-shadow-hover) !important;
+    }
+    .stButton > button:hover p,
+    .stDownloadButton > button:hover p,
+    [data-testid="stFormSubmitButton"] > button:hover p {
+        color: #FFFFFF !important;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .stButton > button:not(:disabled):active,
+    .stDownloadButton > button:not(:disabled):active,
+    [data-testid="stFormSubmitButton"] > button:not(:disabled):active {
+        transform: scale(0.97) !important;
+    }
+}
+
+/* 11. Inputs, Selectboxes, Expanders e Uploaders */
+div[data-baseweb="input"] > div,
+div[data-baseweb="select"] > div,
+.stNumberInput div[data-baseweb="input"] > div,
+.stTextArea textarea {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-strong) !important;
+    border-radius: 10px !important;
+    color: var(--text-primary) !important;
+    box-shadow: none !important;
+    transition-property: border-color, box-shadow !important;
+    transition-duration: 150ms !important;
+}
+
+div[data-baseweb="input"]:focus-within > div,
+div[data-baseweb="select"]:focus-within > div {
+    border-color: var(--gold-accent) !important;
+    box-shadow: 0 0 0 2px rgba(184, 151, 88, 0.2) !important;
+}
+
+div[data-testid="stExpander"] {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--card-radius) !important;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    margin-bottom: 0.9rem !important;
+}
+
+section[data-testid="stFileUploaderDropzone"] {
+    background-color: var(--bg-card-alt) !important;
+    border: 1.5px dashed var(--gold-accent) !important;
+    border-radius: var(--card-radius) !important;
+    padding: 22px !important;
+}
+
+/* 12. Tabelas Analíticas (Sem Corte Lateral nos Cabeçalhos + Números Tabulares) */
+.mazon-table-wrapper {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    width: 100%;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    margin-bottom: 1.25rem;
+}
+
+.mazon-table {
+    width: 100%;
+    min-width: 780px;
+    border-collapse: collapse;
+    background-color: var(--bg-card);
+    font-size: 0.855rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.mazon-table thead tr {
+    background-color: var(--bg-sidebar);
+    border-bottom: 2px solid var(--gold-accent);
+    text-align: left;
+}
+
+.mazon-table th {
+    padding: 13px 15px;
+    color: var(--cream-light) !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    white-space: nowrap !important;
+}
+
+.mazon-table td {
+    padding: 11px 15px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.mazon-table tbody tr:nth-child(even) {
+    background-color: var(--bg-card-alt);
+}
+
+@media (hover: hover) {
+    .mazon-table tbody tr:hover {
+        background-color: rgba(184, 151, 88, 0.09);
+    }
+}
+
+/* 13. Tela de Login Executiva Centralizada */
+.mazon-login-box {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-top: 4px solid var(--gold-accent);
+    border-radius: 16px;
+    padding: 2.1rem 2.2rem 1.6rem 2.2rem;
+    box-shadow: 0 16px 36px -6px rgba(11, 25, 44, 0.08), 0 4px 12px -2px rgba(11, 25, 44, 0.04);
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.mazon-login-badge {
+    display: inline-block;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gold-accent);
+    background-color: rgba(11, 25, 44, 0.04);
+    border: 1px solid rgba(184, 151, 88, 0.35);
+    border-radius: 99px;
+    padding: 4px 12px;
+    margin-bottom: 10px;
+}
+
+/* Divisores */
+hr {
+    border-color: var(--border-subtle) !important;
 }
